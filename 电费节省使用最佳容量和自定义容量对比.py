@@ -123,7 +123,9 @@ def load_data(load_file, price_config_file):
                     print("检测到15分钟间隔数据，将转换为小时数据...")
                     
                     # 按日期和小时分组，计算每小时的平均负载
-                    hourly_load = load_df.groupby([load_df['datetime'].dt.date, load_df['hour']])['load'].mean().reset_index()
+                    # --- 修改：将 mean() 改为 max() 以保留小时内的峰值 --- 
+                    hourly_load = load_df.groupby([load_df['datetime'].dt.date, load_df['hour']])['load'].max().reset_index() # 使用 max()
+                    # --- 修改结束 ---
                     hourly_load.columns = ['date', 'hour', 'load']
                     
                     # 重新创建datetime列
@@ -171,22 +173,46 @@ def load_data(load_file, price_config_file):
             hour = row['hour']
             try:
                 # 从时段配置中获取时段类型（数字1-5）
-                period_type = time_periods.loc[
+                period_type_raw = time_periods.loc[
                     (time_periods['月份'] == month),
                     f'{hour}-{hour+1}'
                 ].values[0]
-                
-                # 根据时段类型查找对应电价
-                price = price_rules.loc[
-                    price_rules['时段类型'] == period_type,
+
+                # --- 修改开始 ---
+                # 确保 period_type 是整数，以便正确匹配
+                try:
+                    period_type = int(period_type_raw)
+                except (ValueError, TypeError):
+                     print(f"警告：月份={month} 小时={hour} 查找到的时段类型 '{period_type_raw}' 不是有效整数，将使用默认值。")
+                     return pd.Series({'price': 0, 'period_type': 3}) # 使用默认值
+
+                # 根据时段类型和月份查找对应电价
+                price_lookup = price_rules.loc[
+                    (price_rules['月份'] == month) &        # 增加月份过滤
+                    (price_rules['时段类型'] == period_type), # 使用整数 period_type 匹配
                     '电价'
-                ].values[0]
-                
+                ]
+
+                if not price_lookup.empty:
+                    price = price_lookup.values[0]
+                else:
+                     # 如果找不到精确匹配，打印警告并返回 NaN，让后续的 fillna 处理
+                     print(f"警告：无法在 '电价配置' 表中找到 月份={month}, 时段类型={period_type} 的电价，将使用 NaN。")
+                     price = np.nan # 需要 import numpy as np，或者直接返回0
+
+                # --- 修改结束 ---
+
+                if month in [7, 8, 9] and period_type == 1: # 或者指定尖峰具体小时
+                     print(f"调试 load_data: 月份={month}, 小时={hour}, 查找到的 period_type={period_type}, price={price}")
+                elif month in [7, 8, 9] and hour in [18, 19, 20, 21]: # 检查尖峰时段的小时
+                     print(f"调试 load_data (尖峰时段检查): 月份={month}, 小时={hour}, 查找到的 period_type={period_type}, price={price}")
+
                 return pd.Series({'price': price, 'period_type': period_type})
             except Exception as e:
-                print(f"警告：无法获取月份{month}小时{hour}的电价和时段类型，使用默认值。")
+                print(f"警告：无法获取月份{month}小时{hour}的电价和时段类型，使用默认值。错误: {e}") # 添加错误信息
+                traceback.print_exc() # 打印详细错误堆栈
                 return pd.Series({'price': 0, 'period_type': 3})  # 使用默认值
-        
+
         # 应用函数添加电价和时段类型列
         load_df[['price', 'period_type']] = load_df.apply(get_price_and_period, axis=1)
         
@@ -228,8 +254,12 @@ def load_data(load_file, price_config_file):
         # 重新计算缺失的电价和时段类型
         missing_price = merged_df['price'].isna()
         if missing_price.any():
+            # --- 修改开始 ---
+            # 确保 get_price_and_period 在处理缺失值时也能正确查找
+            # 注意：这里直接应用 get_price_and_period，确保其内部逻辑已修复
+            # --- 修改结束 ---
             merged_df.loc[missing_price, ['price', 'period_type']] = merged_df[missing_price].apply(get_price_and_period, axis=1)
-        
+
         print(f"数据处理完成！共有 {len(all_dates)} 天的数据，每天24小时。")
         
         # 返回填补后的数据
@@ -667,16 +697,50 @@ def calculate_annual_cost(data):
         # 获取需量单价
         demand_price = float(input('请输入需量单价（元/kW·月）: '))
         
-        # 计算每个月最大负载
-        monthly_max_loads = data.groupby('month')['load'].max()
+        # --- 新增：询问计算方式 ---
+        auto_calc_max_load = input("是否自动从数据中计算每月最大负载？(y/n，默认为y): ").lower()
         
-        # 显示每月最大负载
-        print("\n每月最大负载:")
-        for month, max_load in monthly_max_loads.items():
-            print(f"月份 {month}: {max_load:.2f} kW")
+        monthly_max_loads = None # 初始化
         
+        if auto_calc_max_load != 'n':
+            print("将自动计算每月最大负载...")
+            # 计算每个月最大负载
+            monthly_max_loads = data.groupby('month')['load'].max()
+            
+            # 显示每月最大负载
+            print("\\n自动计算的每月最大负载:")
+            for month, max_load in monthly_max_loads.items():
+                print(f"月份 {month}: {max_load:.2f} kW")
+        else:
+            print("请输入每个月的最大负载值...")
+            manual_max_loads = {}
+            all_months_in_data = sorted(data['month'].unique()) # 获取数据中实际存在的月份
+            for month in range(1, 13): # 循环1到12月
+                 # 检查该月份是否在数据中存在，以提供更好的提示
+                 month_exists_in_data = month in all_months_in_data
+                 prompt_suffix = "" if month_exists_in_data else " (注意：该月份数据中可能不存在)"
+                 
+                 while True:
+                     try:
+                         load_input = input(f"请输入月份 {month} 的最大负载 (kW){prompt_suffix}: ")
+                         max_load = float(load_input)
+                         if max_load >= 0:
+                             manual_max_loads[month] = max_load
+                             break
+                         else:
+                             print("负载值不能为负数，请重新输入。")
+                     except ValueError:
+                         print("输入无效，请输入一个数字。")
+            # 使用手动输入的值 (将其转换为与 groupby 结果类似的 Pandas Series 以统一后续处理)
+            monthly_max_loads = pd.Series(manual_max_loads)
+            print("\\n手动输入的每月最大负载:")
+            for month, max_load in monthly_max_loads.items():
+                 print(f"月份 {month}: {max_load:.2f} kW")
+        # --- 新增结束 ---
+
         # 计算变压器基本电费（需量单价乘以每个月中的最大功率）
-        transformer_basic_cost = sum(monthly_max_loads) * demand_price
+        # 确保使用 .values() 来处理 Series 或字典的值
+        transformer_basic_cost = sum(monthly_max_loads.values()) * demand_price
         
         # 计算年度总电费（含变压器基本电费和电量电费）
         total_cost = transformer_basic_cost + total_electricity_cost
