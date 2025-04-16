@@ -1,0 +1,10 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+
+# Your rule content
+
+- You can @ files here
+每次修改完代码请保存一个版本文件，在原有的文件名称后加入版本后缀V，比如第一次修改完之后，保存该代码文件，命名为XXX.V1，第二次修改完后，文件命名为XXX.V3
