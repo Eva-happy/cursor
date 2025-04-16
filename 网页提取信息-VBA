@@ -1,0 +1,299 @@
+Option Explicit
+
+' 将类型定义移到标准模块中
+Private Type ColumnInfo
+    Index As Long
+    Text As String
+End Type
+
+' 添加引用: Microsoft HTML Object Library, Microsoft Internet Controls, Selenium Type Library
+Sub 获取电价信息()
+    Dim sheet As Worksheet
+    Dim row As Long
+    
+    ' 创建文件夹保存原始文件
+    Dim folderPath As String
+    folderPath = ThisWorkbook.Path & "\电价文件\" & Format(Date, "yyyy-mm-dd")
+    If Dir(folderPath, vbDirectory) = "" Then
+        MkDir folderPath
+    End If
+    
+    ' 创建或获取数据表
+    On Error Resume Next
+    Set sheet = ThisWorkbook.Sheets("电价统计表")
+    If sheet Is Nothing Then
+        Set sheet = ThisWorkbook.Sheets.Add
+        sheet.Name = "电价统计表"
+    End If
+    On Error GoTo 0
+    
+    ' 清除现有数据
+    sheet.Cells.Clear
+    
+    ' 设置统一的表头
+    With sheet
+        .Cells(1, 1) = "省份"
+        .Cells(1, 2) = "月份"
+        .Cells(1, 3) = "文件路径"
+        .Cells(1, 4) = "用电类型"
+        .Cells(1, 5) = "电压等级"
+        .Cells(1, 6) = "电度用电价格(元/千瓦时)"
+        .Cells(1, 7) = "代理购电价格"
+        .Cells(1, 8) = "上网环节线损电价"
+        .Cells(1, 9) = "电量输配电价"
+        .Cells(1, 10) = "系统运行费用"
+        .Cells(1, 11) = "政府性基金及附加"
+        .Cells(1, 12) = "尖峰时段"
+        .Cells(1, 13) = "高峰时段"
+        .Cells(1, 14) = "平时段"
+        .Cells(1, 15) = "低谷时段"
+        .Cells(1, 16) = "容量电价(元/千瓦·月)"
+        .Range("A1:P1").Font.Bold = True
+    End With
+    
+    ' 选择浏览器
+    Dim browserChoice As VbMsgBoxResult
+    browserChoice = MsgBox("是否使用Chrome浏览器？" & vbCrLf & "选择'是'使用Chrome，选择'否'使用Edge", _
+                          vbYesNoCancel + vbQuestion, "选择浏览器")
+    
+    If browserChoice = vbCancel Then
+        Exit Sub
+    End If
+    
+    ' 初始化Selenium
+    Dim driver As Object
+    If browserChoice = vbYes Then
+        Set driver = CreateObject("Selenium.ChromeDriver")
+    Else
+        Set driver = CreateObject("Selenium.EdgeDriver")
+    End If
+    
+    ' 设置浏览器窗口大小
+    driver.Window.SetSize 1920, 1080
+    
+    ' 设置隐式等待时间
+    driver.Timeouts.ImplicitWait = 10000 ' 10秒
+    
+    ' 访问页面
+    driver.Get "https://www.95598.cn/osgweb/ipElectrovalenceStandard"
+    
+    ' 等待页面加载
+    Application.Wait Now + TimeValue("00:00:03")
+    
+    ' 选择省份（从下拉菜单中）
+    Dim provinceSelect As WebElement
+    Set provinceSelect = driver.FindElementByClassName("province-select")
+    provinceSelect.Click
+    Application.Wait Now + TimeValue("00:00:01")
+    
+    ' 获取所有省份链接
+    Dim provinceLinks As WebElements
+    Set provinceLinks = driver.FindElementsByClassName("province-item")
+    
+    row = 2 ' 从第二行开始写入数据
+    
+    ' 遍历每个省份
+    Dim provinceLink As WebElement
+    For Each provinceLink In provinceLinks
+        Dim provinceName As String
+        provinceName = provinceLink.Text
+        
+        ' 点击省份
+        provinceLink.Click
+        Application.Wait Now + TimeValue("00:00:02")
+        
+        ' 点击"电价标准"
+        driver.FindElementByLinkText("电价标准").Click
+        Application.Wait Now + TimeValue("00:00:02")
+        
+        ' 点击"代理购电"
+        driver.FindElementByLinkText("代理购电").Click
+        Application.Wait Now + TimeValue("00:00:02")
+        
+        ' 获取所有月份的价格表链接
+        Dim priceLinks As WebElements
+        Set priceLinks = driver.FindElementsByXPath("//a[contains(text(), '代理购电') and contains(text(), '年') and contains(text(), '月')]")
+        
+        ' 遍历每个月份的链接
+        Dim priceLink As WebElement
+        For Each priceLink In priceLinks
+            Dim monthInfo As String
+            monthInfo = priceLink.Text
+            
+            ' 点击链接
+            priceLink.Click
+            Application.Wait Now + TimeValue("00:00:03")
+            
+            ' 保存PDF或图片文件
+            Dim fileName As String
+            fileName = provinceName & "_" & monthInfo & "_" & Format(Now, "yyyymmddhhnnss")
+            
+            ' 检查是PDF还是图片
+            If driver.FindElementsByTagName("embed").Count > 0 Then
+                ' PDF文件
+                fileName = fileName & ".pdf"
+                ' 保存PDF文件的代码
+                driver.ExecuteScript "window.print();" ' 这里需要处理打印对话框
+            Else
+                ' 图片文件
+                fileName = fileName & ".png"
+                ' 截取整个页面
+                driver.TakeScreenshot.SaveAs folderPath & "\" & fileName
+            End If
+            
+            ' 记录到Excel
+            sheet.Cells(row, 1) = provinceName
+            sheet.Cells(row, 2) = monthInfo
+            sheet.Cells(row, 3) = folderPath & "\" & fileName
+            
+            ' 提取表格数据（如果可见）
+            On Error Resume Next
+            Dim table As WebElement
+            Set table = driver.FindElementByTagName("table")
+            If Not table Is Nothing Then
+                ' 提取表格数据的代码...
+                ' [这部分代码保持不变]
+            End If
+            On Error GoTo 0
+            
+            row = row + 1
+            
+            ' 返回上一页
+            driver.NavigateBack
+            Application.Wait Now + TimeValue("00:00:02")
+        Next priceLink
+        
+        ' 返回省份选择
+        driver.Get "https://www.95598.cn/osgweb/ipElectrovalenceStandard"
+        Application.Wait Now + TimeValue("00:00:03")
+    Next provinceLink
+    
+    ' 关闭浏览器
+    driver.Quit
+    
+    ' 格式化表格
+    With sheet.Columns("A:P")
+        .AutoFit
+        .WrapText = True
+    End With
+    sheet.Range("A1").CurrentRegion.Borders.LineStyle = xlContinuous
+    
+    ' 创建超链接
+    Dim linkRange As Range
+    Dim cell As Range
+    Set linkRange = sheet.Range("C2:C" & row - 1)
+    For Each cell In linkRange
+        If cell.Value <> "" Then
+            sheet.Hyperlinks.Add Anchor:=cell, Address:=cell.Value
+        End If
+    Next cell
+    
+    MsgBox "电价信息获取完成！文件保存在：" & folderPath, vbInformation
+End Sub
+
+' 分析表头结构，返回列索引数组
+Private Function AnalyzeTableHeader(table As Object) As ColumnInfo()
+    Dim headerRow As Object
+    Dim th As Object, i As Long
+    Dim maxColumns As Long
+    maxColumns = 50 ' 设置一个合理的最大列数
+    
+    Dim tempArray() As ColumnInfo
+    ReDim tempArray(1 To maxColumns)
+    Dim currentIndex As Long
+    currentIndex = 0
+    
+    ' 获取表头行
+    Set headerRow = table.getElementsByTagName("tr")(0)
+    
+    ' 分析表头
+    i = 1
+    For Each th In headerRow.getElementsByTagName("th")
+        Dim headerText As String
+        headerText = th.innerText
+        
+        ' 根据关键字匹配表头
+        If InStr(headerText, "用电类") > 0 Then
+            currentIndex = currentIndex + 1
+            tempArray(currentIndex).Text = "用电类型"
+            tempArray(currentIndex).Index = i
+        ElseIf InStr(headerText, "电压等级") > 0 Then
+            currentIndex = currentIndex + 1
+            tempArray(currentIndex).Text = "电压等级"
+            tempArray(currentIndex).Index = i
+        ElseIf InStr(headerText, "电度用电价格") > 0 Or (InStr(headerText, "电度") > 0 And InStr(headerText, "电价") > 0) Then
+            currentIndex = currentIndex + 1
+            tempArray(currentIndex).Text = "电度用电价格"
+            tempArray(currentIndex).Index = i
+        ElseIf InStr(headerText, "代理购电价格") > 0 Then
+            currentIndex = currentIndex + 1
+            tempArray(currentIndex).Text = "代理购电价格"
+            tempArray(currentIndex).Index = i
+        ElseIf (InStr(headerText, "上网") > 0 And InStr(headerText, "线损") > 0) Or InStr(headerText, "环节") > 0 Then
+            currentIndex = currentIndex + 1
+            tempArray(currentIndex).Text = "上网环节线损电价"
+            tempArray(currentIndex).Index = i
+        ElseIf InStr(headerText, "输配电价") > 0 Then
+            currentIndex = currentIndex + 1
+            tempArray(currentIndex).Text = "电量输配电价"
+            tempArray(currentIndex).Index = i
+        ElseIf InStr(headerText, "系统运行") > 0 Then
+            currentIndex = currentIndex + 1
+            tempArray(currentIndex).Text = "系统运行费用"
+            tempArray(currentIndex).Index = i
+        ElseIf (InStr(headerText, "政府") > 0 And InStr(headerText, "基金") > 0) Or InStr(headerText, "附加") > 0 Then
+            currentIndex = currentIndex + 1
+            tempArray(currentIndex).Text = "政府性基金及附加"
+            tempArray(currentIndex).Index = i
+        ElseIf InStr(headerText, "尖峰") > 0 Then
+            currentIndex = currentIndex + 1
+            tempArray(currentIndex).Text = "尖峰时段"
+            tempArray(currentIndex).Index = i
+        ElseIf InStr(headerText, "高峰") > 0 Then
+            currentIndex = currentIndex + 1
+            tempArray(currentIndex).Text = "高峰时段"
+            tempArray(currentIndex).Index = i
+        ElseIf InStr(headerText, "平时") > 0 Then
+            currentIndex = currentIndex + 1
+            tempArray(currentIndex).Text = "平时段"
+            tempArray(currentIndex).Index = i
+        ElseIf InStr(headerText, "低谷") > 0 Then
+            currentIndex = currentIndex + 1
+            tempArray(currentIndex).Text = "低谷时段"
+            tempArray(currentIndex).Index = i
+        ElseIf InStr(headerText, "容量") > 0 Or InStr(headerText, "需量") > 0 Then
+            currentIndex = currentIndex + 1
+            tempArray(currentIndex).Text = "容量电价"
+            tempArray(currentIndex).Index = i
+        End If
+        
+        i = i + 1
+    Next th
+    
+    ' 调整数组大小以匹配实际找到的列数
+    If currentIndex > 0 Then
+        ReDim Preserve tempArray(1 To currentIndex)
+        AnalyzeTableHeader = tempArray
+    Else
+        ReDim tempArray(1 To 1)
+        tempArray(1).Text = ""
+        tempArray(1).Index = 0
+        AnalyzeTableHeader = tempArray
+    End If
+End Function
+
+' 从文本中提取省份信息
+Private Function ExtractProvince(text As String) As String
+    Dim provinces() As String
+    provinces = Split("安徽,北京,重庆,福建,甘肃,广东,广西,贵州,海南,河北,河南,黑龙江,湖北,湖南,吉林,江苏,江西,辽宁,内蒙古,宁夏,青海,山东,山西,陕西,上海,四川,天津,西藏,新疆,云南,浙江", ",")
+    
+    Dim i As Long
+    For i = LBound(provinces) To UBound(provinces)
+        If InStr(text, provinces(i)) > 0 Then
+            ExtractProvince = provinces(i)
+            Exit Function
+        End If
+    Next i
+    
+    ExtractProvince = "未知省份"
+End Function

@@ -1,0 +1,90 @@
+<view class="container">
+  <!-- 服务详情头部 -->
+  <view class="service-header">
+    <view class="service-info">
+      <text class="service-name">{{service.name}}</text>
+      <text class="service-price">¥{{service.price}}</text>
+    </view>
+  </view>
+
+  <!-- 服务说明 -->
+  <view class="service-description">
+    <view class="section-title">服务说明</view>
+    <view class="description-content">
+      <text>{{service.description}}</text>
+    </view>
+  </view>
+
+  <!-- 服务特点 -->
+  <view class="service-features">
+    <view class="section-title">服务特点</view>
+    <view class="feature-list">
+      <view class="feature-item" wx:for="{{service.features}}" wx:key="id">
+        <view class="feature-text">
+          <text class="feature-title">{{item.title}}</text>
+          <text class="feature-desc">{{item.description}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 服务流程 -->
+  <view class="service-process">
+    <view class="section-title">服务流程</view>
+    <view class="process-list">
+      <view class="process-item" wx:for="{{service.process}}" wx:key="step">
+        <view class="process-step">{{item.step}}</view>
+        <view class="process-content">
+          <text class="process-title">{{item.title}}</text>
+          <text class="process-desc">{{item.description}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 用户须知 -->
+  <view class="service-notice">
+    <view class="section-title">用户须知</view>
+    <view class="notice-list">
+      <view class="notice-item" wx:for="{{service.notices}}" wx:key="id">
+        <text class="notice-dot">•</text>
+        <text class="notice-text">{{item}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部购买栏 -->
+  <view class="bottom-bar">
+    <view class="contact-btn" bindtap="contactService">
+      <text>客服咨询</text>
+    </view>
+    <view class="price-section">
+      <text class="price-label">价格</text>
+      <text class="price-value">¥{{service.price}}</text>
+    </view>
+    <button class="purchase-btn" bindtap="handlePurchase">立即购买</button>
+  </view>
+
+  <!-- 支付弹窗 -->
+  <view class="payment-modal {{showPayment ? 'show' : ''}}">
+    <view class="modal-content">
+      <view class="modal-header">
+        <text class="modal-title">确认支付</text>
+        <text class="close-btn" bindtap="closePayment">×</text>
+      </view>
+      <view class="payment-info">
+        <text class="payment-service">{{service.name}}</text>
+        <text class="payment-price">¥{{service.price}}</text>
+      </view>
+      <view class="payment-methods">
+        <view class="payment-method {{selectedPayment === 'wxpay' ? 'selected' : ''}}" 
+              bindtap="selectPayment" data-method="wxpay">
+          <text>微信支付</text>
+        </view>
+      </view>
+      <button class="confirm-payment-btn" bindtap="confirmPayment">
+        确认支付 ¥{{service.price}}
+      </button>
+    </view>
+  </view>
+</view> 

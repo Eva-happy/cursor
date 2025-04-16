@@ -1,0 +1,460 @@
+Sub ParseTimeText()
+    Dim ws As Worksheet
+    Dim wsSource As Worksheet
+    Dim inputText As String
+    Dim lines() As String
+    Dim currentRow As Long
+    Dim debugRow As Long
+    Dim currentSeason As String
+    Dim currentMonths As String
+    Dim line As String
+    Dim i As Long
+    Dim timeType As String
+    Dim specificMonths As String
+    Dim lastRow As Long
+    Dim inputChoice As VbMsgBoxResult
+    Dim continueInput As Boolean
+    Dim processedEntries As Collection
+    Dim currentRegion As String ' 新增：当前地区变量
+    
+    ' 检查是否存在"解析结果"工作表
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("解析结果")
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add
+        ws.Name = "解析结果"
+    End If
+    On Error GoTo 0
+    
+
+    ' 如果工作表已存在数据，找到最后一行
+    currentRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).Row
+    If currentRow = 1 Then
+        ' 工作表为空，清除内容并设置表头
+        ws.Cells.Clear
+        ws.Cells(1, 1).value = "地区" ' 新增：地区列
+        ws.Cells(1, 2).value = "季节"
+        ws.Cells(1, 3).value = "月份"
+        ws.Cells(1, 4).value = "时段类型"
+        ws.Cells(1, 5).value = "开始时间"
+        ws.Cells(1, 6).value = "结束时间"
+        ws.Cells(1, 7).value = "Debug Info"
+           
+    ' 设置表头格式
+    With ws.Range("A1:G1")
+        .Font.Bold = True
+        .HorizontalAlignment = xlCenter
+        .Interior.color = RGB(217, 217, 217)
+        .Borders.LineStyle = xlContinuous
+    End With
+    
+    ' 设置整个表格的格式
+    With ws.Columns("A:G")
+        .WrapText = False  ' 禁用自动换行
+        .AutoFit          ' 自动调整列宽
+        .HorizontalAlignment = xlLeft
+    End With
+    
+        currentRow = 2
+    Else
+        ' 工作表已有数据，从最后一行继续
+        currentRow = currentRow + 1
+    End If
+    
+    debugRow = ws.Cells(ws.Rows.Count, 7).End(xlUp).Row + 1
+    Set processedEntries = New Collection
+    
+    ' 询问用户选择输入方式
+    inputChoice = MsgBox("是否从'分时电价政策表'工作表读取数据？" & vbCrLf & _
+                        "选择'是'从工作表读取" & vbCrLf & _
+                        "选择'否'手动输入文本", _
+                        vbYesNoCancel + vbQuestion, "选择输入方式")
+    
+    If inputChoice = vbCancel Then
+        Exit Sub
+    ElseIf inputChoice = vbYes Then
+        ' 从工作表读取数据
+        ' 检查是否存在"分时电价政策表"工作表
+        On Error Resume Next
+        Set wsSource = ThisWorkbook.Worksheets("分时电价政策表")
+        If wsSource Is Nothing Then
+            MsgBox "未找到'分时电价政策表'工作表！请确保该工作表存在，并在A列填写地区，B列第二行开始填写文本。", vbExclamation
+            Exit Sub
+        End If
+        On Error GoTo 0
+        
+        ' 获取源数据的最后一行
+        lastRow = wsSource.Cells(wsSource.Rows.Count, "B").End(xlUp).Row
+        If lastRow < 2 Then
+            MsgBox "在'分时电价政策表'工作表的B列未找到数据！", vbExclamation
+            Exit Sub
+        End If
+        
+        ' 记录开始处理
+        ws.Cells(debugRow, 7).value = "开始处理'分时电价政策表'工作表的数据"
+        debugRow = debugRow + 1
+        
+        ' 处理每一行文本
+        For i = 2 To lastRow
+            line = Trim(wsSource.Cells(i, "B").value)
+            currentRegion = Trim(wsSource.Cells(i, "A").value) ' 获取当前地区
+            
+            ' 记录原始行内容
+            If line <> "" Then
+                ws.Cells(debugRow, 7).value = "地区: " & currentRegion & " 行 " & i & ": " & line
+                debugRow = debugRow + 1
+                
+                Call ProcessTextLine(line, currentSeason, currentMonths, specificMonths, timeType, ws, debugRow, currentRow, processedEntries, currentRegion)
+            End If
+        Next i
+    Else
+        ' 手动输入文本
+        Do
+            ' 获取地区名称
+            currentRegion = InputBox("请输入地区名称：", "地区信息")
+            If currentRegion = "" Then Exit Do
+            
+            ' 获取用户输入的文本
+            inputText = InputBox("请粘贴" & currentRegion & "的分时电价政策文本（如果已完成所有粘贴，请直接点击取消按钮）：", "文本解析")
+            
+            If inputText = "" Then
+                Exit Do
+            End If
+            
+            ' 预处理文本
+            inputText = Replace(inputText, vbCrLf, vbLf)
+            inputText = Replace(inputText, vbCr, vbLf)
+            inputText = Replace(inputText, "，", "、")
+            inputText = Replace(inputText, ",", "、")
+            
+            ' 标准化换行符
+            While InStr(inputText, vbLf & vbLf) > 0
+                inputText = Replace(inputText, vbLf & vbLf, vbLf)
+            Wend
+            
+            ' 按行分割文本
+            lines = Split(inputText, vbLf)
+            
+            ' 记录原始文本
+            ws.Cells(debugRow, 7).value = "新输入文本块开始 - 地区: " & currentRegion
+            debugRow = debugRow + 1
+            
+            ' 处理每一行
+            For i = 0 To UBound(lines)
+                line = Trim(lines(i))
+                
+                ' 记录原始行内容
+                If line <> "" Then
+                    Call ProcessTextLine(line, currentSeason, currentMonths, specificMonths, timeType, ws, debugRow, currentRow, processedEntries, currentRegion)
+                End If
+            Next i
+            
+            ws.Cells(debugRow, 7).value = "当前文本块处理完成"
+            debugRow = debugRow + 1
+            
+            ' 询问是否继续输入
+            continueInput = MsgBox("是否还有更多地区的文本需要粘贴？", vbYesNo + vbQuestion, "继续输入") = vbYes
+        Loop While continueInput
+    End If
+    
+    ' 自动调整列宽
+    ws.Columns("A:G").AutoFit
+    ' 最后再次确保格式正确
+    With ws.Columns("A:G")
+        .WrapText = False  ' 禁用自动换行
+        .AutoFit          ' 自动调整列宽
+    End With
+    
+    MsgBox "文本解析完成！结果已保存在'解析结果'工作表中。请运行ConvertToTimeConfig更新时段表。", vbInformation
+End Sub
+
+Private Function ExtractMonths(text As String) As String
+    Dim result As String
+    Dim start As Long
+    Dim finish As Long
+    
+    ' 提取括号中的月份信息
+    start = InStr(text, "(")
+    If start = 0 Then start = InStr(text, "（")
+    
+    finish = InStr(text, ")")
+    If finish = 0 Then finish = InStr(text, "）")
+    
+    If start > 0 And finish > 0 Then
+        result = Mid(text, start + 1, finish - start - 1)
+        ' 移除"月"字
+        result = Replace(result, "月", "")
+        
+        ' 处理范围格式 (如 "3-6")
+        If InStr(result, "-") > 0 Then
+            Dim monthRange() As String
+            monthRange = Split(result, "-")
+            Dim startMonth As Long, endMonth As Long
+            startMonth = CLng(Trim(monthRange(0)))
+            endMonth = CLng(Trim(monthRange(1)))
+            
+            ' 构建月份列表
+            Dim monthList As String
+            monthList = ""
+            Dim m As Long
+            For m = startMonth To endMonth
+                If monthList <> "" Then monthList = monthList & "、"
+                monthList = monthList & CStr(m)
+            Next m
+            result = monthList
+        End If
+    Else
+        ' 如果没有括号，尝试提取"月份："后的内容
+        start = InStr(text, "月份：")
+        If start > 0 Then
+            result = Mid(text, start + 3)
+            ' 移除"月"字
+            result = Replace(result, "月", "")
+        End If
+    End If
+    
+    ExtractMonths = result
+End Function
+
+Private Function ExtractTimePairs(text As String) As String()
+    Dim timeStr As String
+    Dim pos As Long
+    
+    ' 提取冒号后的时间信息
+    pos = InStr(text, "：")
+    If pos = 0 Then pos = InStr(text, ":")
+    
+    If pos > 0 Then
+        timeStr = Mid(text, pos + 1)
+        timeStr = Trim(timeStr)  ' 添加去除首尾空格
+        
+        ' 替换中文顿号、逗号和分号
+        timeStr = Replace(timeStr, "、", ",")
+        timeStr = Replace(timeStr, "，", ",")
+        timeStr = Replace(timeStr, "；", ",")
+        timeStr = Replace(timeStr, ";", ",")
+        
+        ' 替换不同类型的连字符为标准连字符
+        timeStr = Replace(timeStr, "—", "-")  ' 替换中文破折号
+        timeStr = Replace(timeStr, "－", "-")  ' 替换全角连字符
+        timeStr = Replace(timeStr, "–", "-")   ' 替换短破折号
+        timeStr = Replace(timeStr, "─", "-")   ' 替换水平线
+        timeStr = Replace(timeStr, "━", "-")   ' 替换粗水平线
+        
+        ' 处理括号中的说明文字
+        Dim bracketStart As Long, bracketEnd As Long
+        bracketStart = InStr(timeStr, "（")
+        If bracketStart > 0 Then
+            bracketEnd = InStr(bracketStart, timeStr, "）")
+            If bracketEnd > 0 Then
+                timeStr = Left(timeStr, bracketStart - 1) & Mid(timeStr, bracketEnd + 1)
+            End If
+        End If
+        
+        ' 去除多余的空格
+        timeStr = Replace(timeStr, " ", "")
+        
+        ' 分割多个时间段
+        Dim timeParts() As String
+        timeParts = Split(timeStr, ",")
+        
+        ' 计算有效的时间段对数
+        Dim validPairs As Long
+        validPairs = 0
+        Dim i As Long
+        
+        ' 先统计有效时间对的数量
+        For i = 0 To UBound(timeParts)
+            Dim currentPart As String
+            currentPart = Trim(timeParts(i))
+            If currentPart <> "" Then
+                If InStr(currentPart, "-") > 0 Then
+                    ' 检查是否是跨天时间段
+                    If InStr(currentPart, "次日") > 0 Then
+                        validPairs = validPairs + 2  ' 跨天时间段会被拆分为两个时间段
+                    Else
+                        validPairs = validPairs + 1
+                    End If
+                ElseIf InStr(currentPart, "至") > 0 Then
+                    validPairs = validPairs + 1
+                End If
+            End If
+        Next i
+        
+        ' 创建结果数组
+        Dim result() As String
+        If validPairs > 0 Then
+            ReDim result(validPairs * 2 - 1)  ' 每对时间需要两个元素
+        Else
+            ReDim result(0)
+            ExtractTimePairs = result
+            Exit Function
+        End If
+        
+        ' 处理每个时间段
+        Dim resultIndex As Long
+        resultIndex = 0
+        
+        For i = 0 To UBound(timeParts)
+            currentPart = Trim(timeParts(i))
+            If currentPart <> "" Then
+                ' 替换"至"为"-"
+                currentPart = Replace(currentPart, "至", "-")
+                
+                If InStr(currentPart, "-") > 0 Then
+                    Dim times() As String
+                    times = Split(currentPart, "-")
+                    
+                    ' 处理跨天时间段
+                    If InStr(currentPart, "次日") > 0 Then
+                        ' 移除"次日"文字
+                        times(1) = Replace(times(1), "次日", "")
+                        
+                        ' 添加第一段：从开始时间到24:00
+                        result(resultIndex) = Trim(times(0))
+                        result(resultIndex + 1) = "24:00"
+                        resultIndex = resultIndex + 2
+                        
+                        ' 添加第二段：从00:00到结束时间
+                        result(resultIndex) = "00:00"
+                        result(resultIndex + 1) = Trim(times(1))
+                        resultIndex = resultIndex + 2
+                    Else
+                        ' 普通时间段
+                        result(resultIndex) = Trim(times(0))
+                        result(resultIndex + 1) = Trim(times(1))
+                        resultIndex = resultIndex + 2
+                    End If
+                End If
+            End If
+        Next i
+        
+        ExtractTimePairs = result
+    Else
+        ' 如果没有找到冒号，返回空数组
+        Dim emptyResult(0) As String
+        ExtractTimePairs = emptyResult
+    End If
+End Function
+
+Private Sub ProcessTextLine(ByVal line As String, ByRef currentSeason As String, ByRef currentMonths As String, _
+                          ByRef specificMonths As String, ByRef timeType As String, _
+                          ByVal ws As Worksheet, ByRef debugRow As Long, ByRef currentRow As Long, _
+                          ByVal processedEntries As Collection, ByVal currentRegion As String)
+    ' 记录调试信息
+    ws.Cells(debugRow, 7).value = "正在处理地区 " & currentRegion & " 的行: " & line
+    debugRow = debugRow + 1
+    
+    ' 声明所有需要的变量
+    Dim start As Long, finish As Long
+    Dim bracketContent As String
+    Dim monthRange() As String
+    Dim monthList As String
+    Dim m As Long
+    Dim monthPart As String
+    Dim monthGroups() As String
+    Dim fullMonthList As String
+    Dim monthGroup As Variant
+    Dim startMonth As Long, endMonth As Long
+    
+    ' 检查括号中的月份范围格式
+    start = InStr(line, "(")
+    If start = 0 Then start = InStr(line, "（")
+    finish = InStr(line, ")")
+    If finish = 0 Then finish = InStr(line, "）")
+    
+    If start > 0 And finish > 0 Then
+        bracketContent = Mid(line, start + 1, finish - start - 1)
+        If InStr(bracketContent, "月") > 0 Then
+            ' 处理括号中的月份
+            bracketContent = Replace(bracketContent, "月", "")
+            bracketContent = Replace(bracketContent, "，", "、")
+            bracketContent = Replace(bracketContent, ",", "、")
+            
+            If InStr(bracketContent, "-") > 0 Then
+                ' 处理范围格式 (如 "3-6")
+                monthRange = Split(bracketContent, "-")
+                monthList = ""
+                startMonth = CLng(Trim(monthRange(0)))
+                endMonth = CLng(Trim(monthRange(1)))
+                
+                For m = startMonth To endMonth
+                    If monthList <> "" Then monthList = monthList & "、"
+                    monthList = monthList & CStr(m)
+                Next m
+            ElseIf InStr(bracketContent, "、") > 0 Then
+                ' 处理列表格式 (如 "10、11")
+                monthGroups = Split(bracketContent, "、")
+                monthList = ""
+                
+                For Each monthGroup In monthGroups
+                    If monthList <> "" Then monthList = monthList & "、"
+                    monthList = monthList & Trim(monthGroup)
+                Next monthGroup
+            Else
+                ' 单个月份
+                monthList = Trim(bracketContent)
+            End If
+            
+            currentMonths = monthList
+            specificMonths = monthList
+            ws.Cells(debugRow, 7).value = "地区: " & currentRegion & ", 从括号提取到月份: " & monthList
+            debugRow = debugRow + 1
+        End If
+    End If
+    
+    ' 检查是否包含月份信息（非季节行）
+    If InStr(line, "月份") > 0 Then
+        ' 提取月份信息
+        monthPart = Trim(Mid(line, InStr(line, "月份") + 2))
+        monthPart = Replace(monthPart, "：", ":")  ' 统一冒号格式
+        monthPart = Mid(monthPart, InStr(monthPart, ":") + 1)  ' 获取冒号后的内容
+        monthPart = Replace(monthPart, "月", "")  ' 移除"月"字
+        monthPart = Replace(monthPart, "。", "")
+        monthPart = Replace(monthPart, "，", "、")
+        monthPart = Replace(monthPart, ",", "、")
+        monthPart = Trim(monthPart)
+        
+        ' 分割多个月份组
+        monthGroups = Split(monthPart, "、")
+        
+        ' 构建完整的月份列表
+        fullMonthList = ""
+        
+        ' 处理每个月份组
+        For Each monthGroup In monthGroups
+            If InStr(CStr(monthGroup), "-") > 0 Then
+                ' 处理月份范围
+                monthRange = Split(CStr(monthGroup), "-")
+                
+                ' 确保转换成功
+                On Error Resume Next
+                startMonth = CLng(Trim(monthRange(0)))
+                endMonth = CLng(Trim(monthRange(1)))
+                
+                If Err.Number = 0 Then
+                    ' 构建范围内的月份列表
+                    For m = startMonth To endMonth
+                        If fullMonthList <> "" Then fullMonthList = fullMonthList & "、"
+                        fullMonthList = fullMonthList & CStr(m)
+                    Next m
+                End If
+                On Error GoTo 0
+            Else
+                ' 处理单个月份
+                If fullMonthList <> "" Then fullMonthList = fullMonthList & "、"
+                fullMonthList = fullMonthList & Trim(monthGroup)
+            End If
+        Next monthGroup
+        
+        ' 更新当前月份
+        If fullMonthList <> "" Then
+            currentMonths = fullMonthList
+            specificMonths = fullMonthList
+            
+            ' 记录调试信息
+            ws.Cells(debugRow, 7).value = "地区: " & currentRegion & ", 提取到月份: " & fullMonthList
+            debugRow = debugRow + 1
+        End If
+    End If
+End Sub

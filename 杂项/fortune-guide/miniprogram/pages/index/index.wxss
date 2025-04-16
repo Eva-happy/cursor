@@ -1,0 +1,167 @@
+.container {
+  padding: 0;
+  background-color: #f5f5f5;
+}
+
+/* 服务网格样式 */
+.service-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20rpx;
+  padding: 30rpx;
+  background-color: #fff;
+  margin-top: 20rpx;
+}
+
+.grid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30rpx;
+  background: linear-gradient(135deg, #8A2BE2, #6B238E);
+  border-radius: 20rpx;
+  color: #fff;
+}
+
+.grid-item .price {
+  margin-top: 10rpx;
+  font-size: 28rpx;
+}
+
+/* 每日运势提示样式 */
+.daily-fortune {
+  margin: 20rpx;
+  padding: 30rpx;
+  background-color: #fff;
+  border-radius: 20rpx;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 20rpx;
+  padding-left: 20rpx;
+  border-left: 8rpx solid #6B238E;
+}
+
+.fortune-content {
+  color: #666;
+  line-height: 1.6;
+}
+
+.fortune-tips {
+  margin-top: 20rpx;
+}
+
+.tip-item {
+  display: flex;
+  margin: 10rpx 0;
+}
+
+.tip-item .label {
+  color: #999;
+  width: 160rpx;
+}
+
+.tip-item .value {
+  color: #6B238E;
+  font-weight: bold;
+}
+
+/* 咨询师推荐样式 */
+.consultant-section {
+  margin: 20rpx;
+  padding: 30rpx;
+  background-color: #fff;
+  border-radius: 20rpx;
+}
+
+.consultant-scroll {
+  white-space: nowrap;
+  margin-top: 20rpx;
+}
+
+.consultant-card {
+  display: inline-block;
+  width: 300rpx;
+  padding: 20rpx;
+  margin-right: 20rpx;
+  background: #fff;
+  border-radius: 15rpx;
+  box-shadow: 0 2rpx 10rpx rgba(0,0,0,0.1);
+}
+
+.consultant-name {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #333;
+  display: block;
+}
+
+.consultant-title {
+  font-size: 24rpx;
+  color: #666;
+  margin: 5rpx 0;
+  display: block;
+}
+
+.consultant-rating {
+  display: flex;
+  align-items: center;
+  font-size: 24rpx;
+}
+
+.rating-score {
+  color: #f5a623;
+  margin-right: 10rpx;
+}
+
+.rating-count {
+  color: #999;
+}
+
+/* 用户评价样式 */
+.reviews-section {
+  margin: 20rpx;
+  padding: 30rpx;
+  background-color: #fff;
+  border-radius: 20rpx;
+}
+
+.review-card {
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #eee;
+}
+
+.review-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15rpx;
+}
+
+.review-info {
+  flex: 1;
+}
+
+.review-name {
+  font-size: 28rpx;
+  color: #333;
+  display: block;
+}
+
+.review-date {
+  font-size: 24rpx;
+  color: #999;
+}
+
+.review-rating {
+  color: #f5a623;
+  font-size: 28rpx;
+}
+
+.review-content {
+  font-size: 26rpx;
+  color: #666;
+  line-height: 1.6;
+} 

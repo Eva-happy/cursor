@@ -1,0 +1,138 @@
+Sub ParseTimeText()
+    Dim ws As Worksheet
+    Dim wsSource As Worksheet
+    Dim lastRow As Long
+    Dim currentRow As Long
+    Dim i As Long
+    
+    ' 检查是否存在"解析结果"工作表
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("解析结果")
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add
+        ws.Name = "解析结果"
+    End If
+    On Error GoTo 0
+    
+    ' 清除工作表内容并设置表头
+    ws.Cells.Clear
+    ws.Cells(1, 1).value = "地区"
+    ws.Cells(1, 2).value = "季节"
+    ws.Cells(1, 3).value = "月份"
+    ws.Cells(1, 4).value = "时段类型"
+    ws.Cells(1, 5).value = "开始时间"
+    ws.Cells(1, 6).value = "结束时间"
+    ws.Cells(1, 7).value = "Debug Info"
+    
+    ' 设置单元格格式：禁用自动换行
+    ws.Columns("A:G").WrapText = False
+    
+    ' 设置标题行格式
+    With ws.Range("A1:G1")
+        .Font.Bold = True
+        .HorizontalAlignment = xlCenter
+        .Interior.Color = RGB(217, 217, 217)  ' 浅灰色背景
+    End With
+    
+    currentRow = 2
+    
+    ' 从"分时电价政策表"工作表读取数据
+    On Error Resume Next
+    Set wsSource = ThisWorkbook.Worksheets("分时电价政策表")
+    If wsSource Is Nothing Then
+        MsgBox "未找到'分时电价政策表'工作表！请确保该工作表存在。", vbExclamation
+        Exit Sub
+    End If
+    On Error GoTo 0
+    
+    ' 获取源数据的最后一行
+    lastRow = wsSource.Cells(wsSource.Rows.Count, "B").End(xlUp).Row
+    If lastRow < 2 Then
+        MsgBox "在'分时电价政策表'工作表中未找到数据！", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 处理每一行文本
+    For i = 2 To lastRow
+        Dim region As String
+        Dim text As String
+        
+        region = Trim(wsSource.Cells(i, "A").value)
+        text = Trim(wsSource.Cells(i, "B").value)
+        
+        If region <> "" And text <> "" Then
+            ' 解析时段类型和时间
+            Dim timeSlots() As String
+            timeSlots = Split(text, "；")
+            
+            Dim slot As Variant
+            For Each slot In timeSlots
+                If Trim(slot) <> "" Then
+                    ' 提取时段类型
+                    Dim timeType As String
+                    If InStr(slot, "尖峰") > 0 Then
+                        timeType = "尖峰"
+                    ElseIf InStr(slot, "高峰") > 0 Then
+                        timeType = "高峰"
+                    ElseIf InStr(slot, "平段") > 0 Or InStr(slot, "平时") > 0 Then
+                        timeType = "平段"
+                    ElseIf InStr(slot, "低谷") > 0 Then
+                        timeType = "低谷"
+                    ElseIf InStr(slot, "深谷") > 0 Then
+                        timeType = "深谷"
+                    End If
+                    
+                    ' 提取时间段
+                    Dim times() As String
+                    Dim timeRanges As String
+                    
+                    ' 查找冒号后的时间信息
+                    Dim colonPos As Long
+                    colonPos = InStr(slot, "：")
+                    If colonPos = 0 Then colonPos = InStr(slot, ":")
+                    
+                    If colonPos > 0 Then
+                        timeRanges = Trim(Mid(slot, colonPos + 1))
+                        
+                        ' 处理时间范围
+                        times = Split(timeRanges, "、")
+                        Dim timeRange As Variant
+                        For Each timeRange In times
+                            Dim startTime As String, endTime As String
+                            
+                            ' 处理时间格式
+                            If InStr(timeRange, "-") > 0 Then
+                                Dim timeParts() As String
+                                timeParts = Split(timeRange, "-")
+                                startTime = Trim(timeParts(0))
+                                endTime = Trim(timeParts(1))
+                                
+                                ' 标准化时间格式
+                                If Not InStr(startTime, ":") > 0 Then startTime = startTime & ":00"
+                                If Not InStr(endTime, ":") > 0 Then endTime = endTime & ":00"
+                                
+                                ' 处理月份
+                                Dim monthNum As Integer
+                                For monthNum = 1 To 12
+                                    ' 写入数据
+                                    ws.Cells(currentRow, 1).value = region
+                                    ws.Cells(currentRow, 3).value = monthNum & "月"
+                                    ws.Cells(currentRow, 4).value = timeType
+                                    ws.Cells(currentRow, 5).value = startTime
+                                    ws.Cells(currentRow, 6).value = endTime
+                                    
+                                    currentRow = currentRow + 1
+                                Next monthNum
+                            End If
+                        Next timeRange
+                    End If
+                End If
+            Next slot
+        End If
+    Next i
+    
+    ' 自动调整列宽
+    ws.Columns("A:G").AutoFit
+    
+    MsgBox "数据解析完成！", vbInformation
+End Sub

@@ -1,0 +1,85 @@
+VERSION 5.00
+Begin {C62A69F0-16DC-11CE-9E98-00AA00574A4F} RegionSelectorForm
+   Caption         =   "选择地区"
+   ClientHeight    =   3015
+   ClientWidth     =   4560
+   OleObjectBlob   =   "RegionSelectorForm.frx":0000
+   StartUpPosition =   1  'CenterOwner
+End
+Attribute VB_Name = "RegionSelectorForm"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = True
+Attribute VB_Exposed = False
+Option Explicit
+
+Private Sub UserForm_Initialize()
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    Dim i As Long
+    Dim regions As Collection
+    Set regions = New Collection
+    
+    ' 获取解析结果工作表
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("解析国家节假日文字")
+    If ws Is Nothing Then
+        MsgBox "未找到'解析国家节假日文字'工作表！", vbExclamation
+        Me.Hide
+        Exit Sub
+    End If
+    On Error GoTo 0
+    
+    ' 获取最后一行
+    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+    
+    ' 收集所有不同的地区
+    On Error Resume Next
+    For i = 2 To lastRow
+        Dim currentRegion As String
+        currentRegion = Trim(ws.Cells(i, 1).value)
+        If currentRegion <> "" Then
+            regions.Add currentRegion, currentRegion
+        End If
+    Next i
+    On Error GoTo 0
+    
+    ' 将地区添加到列表框
+    Dim region As Variant
+    For Each region In regions
+        RegionList.AddItem CStr(region)
+    Next region
+    
+    ' 如果有地区，选择第一个
+    If RegionList.ListCount > 0 Then
+        RegionList.ListIndex = 0
+    End If
+End Sub
+
+Private Sub OKButton_Click()
+    ' 如果没有选择地区，显示提示并退出
+    If RegionList.ListIndex = -1 Then
+        MsgBox "请选择一个地区！", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 获取选中的地区
+    Dim selectedRegion As String
+    selectedRegion = RegionList.value
+    
+    ' 更新选定地区的时段数据
+    Call UpdateSelectedRegion(selectedRegion)
+    
+    ' 关闭窗体
+    Me.Hide
+End Sub
+
+Private Sub CancelButton_Click()
+    ' 点击取消按钮时关闭窗体
+    Me.Hide
+End Sub
+
+Private Sub RegionList_DblClick(ByVal Cancel As MSForms.ReturnBoolean)
+    ' 双击列表项时执行确认操作
+    Call OKButton_Click
+End Sub 

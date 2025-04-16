@@ -1,0 +1,272 @@
+Public Sub 调试敏感性分析计算()
+    Dim baseSheet As Worksheet
+    Dim ws As Worksheet
+    Dim debugSheet As Worksheet
+    Dim paramTypes As Variant
+    Dim i As Long
+    Dim baseValue As Double
+    Dim newValue As Double
+    
+    ' 创建或获取调试工作表
+    On Error Resume Next
+    Set debugSheet = ThisWorkbook.Sheets("调试结果")
+    If debugSheet Is Nothing Then
+        Set debugSheet = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+        debugSheet.Name = "调试结果"
+    End If
+    On Error GoTo 0
+    
+    ' 设置基础工作表
+    Set baseSheet = ThisWorkbook.Sheets("基础参数及输出结果表")
+    
+    ' 获取上网模式
+    Dim gridMode As String
+    gridMode = baseSheet.Range("B16").Value
+    
+    ' 设置参数类型
+    If gridMode = "全额上网" Then
+        paramTypes = Array( _
+            "发电小时数（单位：小时）", _
+            "电价（单位：元/kWh）", _
+            "消纳率（比率）", _
+            "初始总投资（万元）", _
+            "消交流侧装机容量（备案容量）", _
+            "运维管理费（元/W）", _
+            "技改费（元/W）", _
+            "股权资本金占比", _
+            "还款年限（年）", _
+            "利率", _
+            "脱硫燃煤标杆电价（单位：元/kWh）", _
+            "光伏电站标杆上网电价（单位：元/kWh）", _
+            "集中式光伏-脱硫燃煤标杆电价（单位：元/kWh）", _
+            "集中式光伏-综合上网电价（单位：元/kWh）" _
+        )
+    Else
+        paramTypes = Array( _
+            "发电小时数（单位：小时）", _
+            "电价（单位：元/kWh）", _
+            "消纳率（比率）", _
+            "初始总投资（万元）", _
+            "消交流侧装机容量（备案容量）", _
+            "运维管理费（元/W）", _
+            "技改费（元/W）", _
+            "股权资本金占比", _
+            "还款年限（年）", _
+            "利率", _
+            "脱硫燃煤标杆电价（单位：元/kWh）", _
+            "光伏电站标杆上网电价（单位：元/kWh）", _
+            "集中式光伏-脱硫燃煤标杆电价（单位：元/kWh）", _
+            "集中式光伏-综合上网电价（单位：元/kWh）" _
+        )
+    End If
+    
+    ' 设置表头
+    With debugSheet
+        .Cells.Clear
+        .Range("A1:K1").Value = Array("参数名称", "原始值", "变动后值(+5%)", _
+                                     "全投资IRR", "资本金IRR", "全投回收期", "资本金回收期", _
+                                     "全投资IRR敏感性系数", "资本金IRR敏感性系数", _
+                                     "全投回收期敏感性系数", "资本金回收期敏感性系数")
+        .Range("A1:K1").Font.Bold = True
+        
+        ' 设置列宽
+        .Columns("A:K").AutoFit
+        .Columns("A").ColumnWidth = 40  ' 参数名称列加宽
+        
+        ' 设置格式
+        .Range("B:C").NumberFormat = "0.0000"
+        .Range("D:E").NumberFormat = "0.00%"
+        .Range("F:G").NumberFormat = "0.00"
+        .Range("H:K").NumberFormat = "0.00"
+    End With
+    
+    ' 循环计算每个参数
+    For i = 0 To UBound(paramTypes)
+        Dim paramType As String
+        paramType = paramTypes(i)
+        
+        ' 获取基准值
+        baseValue = GetBaseValue(baseSheet, paramType)
+        
+        ' 如果基准值为0，记录错误并继续下一个
+        If baseValue = 0 Then
+            debugSheet.Cells(i + 2, 1).Value = paramType
+            debugSheet.Cells(i + 2, 2).Value = "基准值为0"
+            GoTo NextParameter
+        End If
+        
+        ' 计算新值 (5%增加)
+        newValue = baseValue * 1.05
+        
+        ' 记录参数信息
+        debugSheet.Cells(i + 2, 1).Value = paramType
+        debugSheet.Cells(i + 2, 2).Value = baseValue
+        debugSheet.Cells(i + 2, 3).Value = newValue
+        
+        ' 在计算目标值之前添加调试信息
+        Debug.Print "----------------------------------------"
+        Debug.Print "开始计算参数: " & paramType
+        
+        ' 获取基准目标值
+        Dim baseIRR As Double, baseCapitalIRR As Double, basePayback As Double, baseCapitalPayback As Double
+        
+        baseIRR = CalculateBaseValue("全投资IRR")
+        baseCapitalIRR = CalculateBaseValue("资本金IRR")
+        basePayback = CalculateBaseValue("全投回收期")
+        baseCapitalPayback = CalculateBaseValue("资本金回收期")
+        
+        Debug.Print "基准值获取完成:"
+        Debug.Print "baseIRR = " & baseIRR
+        Debug.Print "baseCapitalIRR = " & baseCapitalIRR
+        Debug.Print "basePayback = " & basePayback
+        Debug.Print "baseCapitalPayback = " & baseCapitalPayback
+        
+        ' 获取新目标值
+        Dim newIRR As Double, newCapitalIRR As Double, newPayback As Double, newCapitalPayback As Double
+        
+        newIRR = CalculateNewValue(paramType, newValue, "全投资IRR")
+        newCapitalIRR = CalculateNewValue(paramType, newValue, "资本金IRR")
+        newPayback = CalculateNewValue(paramType, newValue, "全投回收期")
+        newCapitalPayback = CalculateNewValue(paramType, newValue, "资本金回收期")
+        
+        Debug.Print "新值计算完成:"
+        Debug.Print "newIRR = " & newIRR
+        Debug.Print "newCapitalIRR = " & newCapitalIRR
+        Debug.Print "newPayback = " & newPayback
+        Debug.Print "newCapitalPayback = " & newCapitalPayback
+        
+        ' 记录目标值
+        debugSheet.Cells(i + 2, 4).Value = newIRR
+        debugSheet.Cells(i + 2, 5).Value = newCapitalIRR
+        debugSheet.Cells(i + 2, 6).Value = newPayback
+        debugSheet.Cells(i + 2, 7).Value = newCapitalPayback
+        
+        ' 计算并记录敏感性系数
+        ' 敏感性系数 = (目标值变化率) / (参数值变化率)
+        ' 参数值变化率固定为5%
+        
+        ' 计算敏感性系数时添加错误处理
+        On Error Resume Next
+        
+        ' 全投资IRR敏感性系数
+        If baseIRR <> 0 Then
+            debugSheet.Cells(i + 2, 8).Value = ((newIRR - baseIRR) / baseIRR) / 0.05
+        Else
+            debugSheet.Cells(i + 2, 8).Value = "N/A"
+        End If
+        
+        ' 资本金IRR敏感性系数
+        If baseCapitalIRR <> 0 Then
+            debugSheet.Cells(i + 2, 9).Value = ((newCapitalIRR - baseCapitalIRR) / baseCapitalIRR) / 0.05
+        Else
+            debugSheet.Cells(i + 2, 9).Value = "N/A"
+        End If
+        
+        ' 全投回收期敏感性系数
+        If basePayback <> 0 Then
+            debugSheet.Cells(i + 2, 10).Value = ((newPayback - basePayback) / basePayback) / 0.05
+        Else
+            debugSheet.Cells(i + 2, 10).Value = "N/A"
+        End If
+        
+        ' 资本金回收期敏感性系数
+        If baseCapitalPayback <> 0 Then
+            debugSheet.Cells(i + 2, 11).Value = ((newCapitalPayback - baseCapitalPayback) / baseCapitalPayback) / 0.05
+        Else
+            debugSheet.Cells(i + 2, 11).Value = "N/A"
+        End If
+        
+        On Error GoTo 0
+        
+NextParameter:
+    Next i
+    
+    ' 美化表格
+    With debugSheet
+        Dim lastRow As Long
+        lastRow = .Cells(.Rows.Count, "A").End(xlUp).row
+        
+        With .Range("A1:K" & lastRow)
+            ' 添加边框
+            .Borders(xlEdgeLeft).LineStyle = xlContinuous
+            .Borders(xlEdgeTop).LineStyle = xlContinuous
+            .Borders(xlEdgeBottom).LineStyle = xlContinuous
+            .Borders(xlEdgeRight).LineStyle = xlContinuous
+            .Borders(xlInsideVertical).LineStyle = xlContinuous
+            .Borders(xlInsideHorizontal).LineStyle = xlContinuous
+            
+            ' 设置对齐
+            .HorizontalAlignment = xlCenter
+            .VerticalAlignment = xlCenter
+        End With
+        
+        ' 调整列宽
+        .Columns("A:K").AutoFit
+    End With
+    
+    MsgBox "调试计算完成！结果已输出到'调试结果'工作表", vbInformation
+End Sub
+
+' 辅助函数：获取参数基准值
+Private Function GetBaseValue(ByVal baseSheet As Worksheet, ByVal paramType As String) As Double
+    Select Case paramType
+        Case "发电小时数", "发电小时数（单位：小时）"
+            GetBaseValue = baseSheet.Range("B23").Value
+        Case "电价", "电价（单位：元/kWh）"
+            GetBaseValue = baseSheet.Range("B42").Value
+        Case "消纳率", "消纳率（比率）"
+            GetBaseValue = baseSheet.Range("B37").Value
+        Case "初始总投资", "初始总投资（万元）"
+            GetBaseValue = baseSheet.Range("F7").Value
+        Case "消交流侧装机容量", "消交流侧装机容量（备案容量）"
+            GetBaseValue = baseSheet.Range("B12").Value
+        Case "运维管理费", "运维管理费（元/W）"
+            GetBaseValue = baseSheet.Range("F24").Value
+        Case "技改费", "技改费（元/W）"
+            GetBaseValue = baseSheet.Range("F25").Value
+        Case "股权资本金占比", "股权资本金占比（比率）"
+            GetBaseValue = baseSheet.Range("J23").Value
+        Case "还款年限", "还款年限（年）"
+            GetBaseValue = baseSheet.Range("J26").Value
+        Case "利率", "利率（比率）"
+            GetBaseValue = baseSheet.Range("J27").Value
+        Case "脱硫燃煤标杆电价", "脱硫燃煤标杆电价（单位：元/kWh）"
+            GetBaseValue = baseSheet.Range("B39").Value
+        Case "光伏电站标杆上网电价", "光伏电站标杆上网电价（单位：元/kWh）"
+            GetBaseValue = baseSheet.Range("B41").Value
+        Case "集中式光伏-脱硫燃煤标杆电价", "集中式光伏-脱硫燃煤标杆电价（单位：元/kWh）"
+            GetBaseValue = baseSheet.Range("B44").Value
+        Case "集中式光伏-综合上网电价", "集中式光伏-综合上网电价（单位：元/kWh）"
+            GetBaseValue = baseSheet.Range("B45").Value
+        Case Else
+            GetBaseValue = 0
+    End Select
+End Function
+
+' 新增函数：获取基准目标值
+Private Function CalculateBaseValue(ByVal targetType As String) As Double
+    Dim baseSheet As Worksheet
+    Set baseSheet = ThisWorkbook.Sheets("基础参数及输出结果表")
+    
+    ' 添加调试信息
+    Debug.Print "正在获取 " & targetType & " 的基准值"
+    
+    Select Case targetType
+        Case "全投资IRR"
+            CalculateBaseValue = baseSheet.Range("D2").Value  ' 修改单元格引用
+            Debug.Print "全投资IRR基准值: " & CalculateBaseValue
+        Case "资本金IRR"
+            CalculateBaseValue = baseSheet.Range("E2").Value  ' 修改单元格引用
+            Debug.Print "资本金IRR基准值: " & CalculateBaseValue
+        Case "全投回收期"
+            CalculateBaseValue = baseSheet.Range("F2").Value  ' 修改单元格引用
+            Debug.Print "全投回收期基准值: " & CalculateBaseValue
+        Case "资本金回收期"
+            CalculateBaseValue = baseSheet.Range("G2").Value  ' 修改单元格引用
+            Debug.Print "资本金回收期基准值: " & CalculateBaseValue
+        Case Else
+            CalculateBaseValue = 0
+            Debug.Print "未知目标类型: " & targetType
+    End Select
+End Function
+

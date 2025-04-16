@@ -1,0 +1,951 @@
+' 添加常量定义
+Private Const PEAK As Integer = 1     ' 尖峰
+Private Const HIGH As Integer = 2     ' 高峰
+Private Const NORMAL As Integer = 3   ' 平段
+Private Const LOW As Integer = 4      ' 低谷
+
+' 首先定义所有辅助函数
+Private Function GetStandardizedMonths(season As String, monthText As String) As String
+    Dim result As String
+    
+    ' 如果是春秋季，需要根据月份判断是春季还是秋季
+    If season = "春秋季" Then
+        Dim months() As String
+        months = Split(monthText, "、")
+        Dim monthList As String
+        monthList = ""
+        
+        Dim i As Long
+        For i = 0 To UBound(months)
+            If InStr(months(i), "-") > 0 Then
+                Dim monthRange() As String
+                monthRange = Split(months(i), "-")
+                Dim startMonth As Long, endMonth As Long
+                
+                ' 确保转换成功
+                On Error Resume Next
+                startMonth = CLng(Trim(monthRange(0)))
+                endMonth = CLng(Trim(monthRange(1)))
+                On Error GoTo 0
+                
+                ' 处理每个月份
+                Dim m As Long
+                For m = startMonth To endMonth
+                    If m >= 3 And m <= 6 Then
+                        If monthList <> "" Then monthList = monthList & "、"
+                        monthList = monthList & CStr(m)
+                    End If
+                Next m
+            Else
+                Dim currentMonth As Long
+                ' 确保转换成功
+                On Error Resume Next
+                currentMonth = CLng(Trim(months(i)))
+                On Error GoTo 0
+                
+                If currentMonth >= 3 And currentMonth <= 6 Then
+                    If monthList <> "" Then monthList = monthList & "、"
+                    monthList = monthList & CStr(currentMonth)
+                End If
+            End If
+        Next i
+        
+        If monthList <> "" Then
+            result = monthList
+        End If
+    ElseIf season = "夏季" Then
+        result = "7、8、9"
+    ElseIf season = "冬季" Then
+        result = "12、1、2"
+    End If
+    
+    GetStandardizedMonths = result
+End Function
+
+Private Function GetSeasonByMonth(monthNum As Integer) As String
+    If monthNum >= 3 And monthNum <= 6 Then
+        GetSeasonByMonth = "春季"
+    ElseIf monthNum >= 7 And monthNum <= 9 Then
+        GetSeasonByMonth = "夏季"
+    ElseIf monthNum >= 10 And monthNum <= 11 Then
+        GetSeasonByMonth = "秋季"
+    Else
+        GetSeasonByMonth = "冬季"
+    End If
+End Function
+
+Private Function ExtractMonths(text As String) As String
+    Dim result As String
+    Dim start As Long
+    Dim finish As Long
+    
+    ' 如果是冬季，直接返回冬季月份
+    If InStr(text, "冬季") > 0 Then
+        ExtractMonths = "12、1、2"
+        Exit Function
+    End If
+    
+    ' 如果是夏季，直接返回夏季月份
+    If InStr(text, "夏季") > 0 Then
+        ExtractMonths = "7、8、9"
+        Exit Function
+    End If
+    
+    ' 提取括号中的月份信息
+    start = InStr(text, "(")
+    If start = 0 Then start = InStr(text, "（")
+    
+    finish = InStr(text, ")")
+    If finish = 0 Then finish = InStr(text, "）")
+    
+    If start > 0 And finish > 0 Then
+        result = Mid(text, start + 1, finish - start - 1)
+    End If
+    
+    ' 如果没有提取到月份，根据季节设置默认值
+    If result = "" Then
+        If InStr(text, "春秋季") > 0 Then
+            result = "3、4、5、6、10、11"
+        End If
+    End If
+    
+    ExtractMonths = result
+End Function
+
+Private Function ExtractTimePairs(text As String) As String()
+    Dim timeStr As String
+    Dim pos As Long
+    
+    ' 提取冒号后的时间信息
+    pos = InStr(text, "：")
+    If pos = 0 Then pos = InStr(text, ":")
+    
+    If pos > 0 Then
+        timeStr = Mid(text, pos + 1)
+        timeStr = Trim(timeStr)  ' 添加去除首尾空格
+        
+        ' 替换中文顿号、逗号和分号
+        timeStr = Replace(timeStr, "、", ",")
+        timeStr = Replace(timeStr, "，", ",")
+        timeStr = Replace(timeStr, "；", ",")
+        timeStr = Replace(timeStr, ";", ",")
+        
+        ' 处理"次日"标记
+        timeStr = Replace(timeStr, "次日", "")
+        
+        ' 处理括号中的说明文字
+        Dim bracketStart As Long, bracketEnd As Long
+        bracketStart = InStr(timeStr, "（")
+        If bracketStart > 0 Then
+            bracketEnd = InStr(bracketStart, timeStr, "）")
+            If bracketEnd > 0 Then
+                timeStr = Left(timeStr, bracketStart - 1) & Mid(timeStr, bracketEnd + 1)
+            End If
+        End If
+        
+        ' 分割多个时间段
+        Dim timeParts() As String
+        timeParts = Split(timeStr, ",")
+        
+        ' 计算有效的时间段对数
+        Dim validPairs As Long
+        validPairs = 0
+        Dim i As Long
+        
+        ' 先统计有效时间对的数量
+        For i = 0 To UBound(timeParts)
+            Dim currentPart As String
+            currentPart = Trim(timeParts(i))
+            If currentPart <> "" And InStr(currentPart, "-") > 0 Then
+                validPairs = validPairs + 1
+            End If
+        Next i
+        
+        If validPairs > 0 Then
+            Dim result() As String
+            ReDim result((validPairs * 2) - 1)
+            
+            Dim resultIndex As Long
+            resultIndex = 0
+            
+            ' 处理每个时间段
+            For i = 0 To UBound(timeParts)
+                Dim currentTime As String
+                currentTime = Trim(timeParts(i))
+                
+                If currentTime <> "" And InStr(currentTime, "-") > 0 Then
+                    Dim timePair() As String
+                    timePair = Split(currentTime, "-")
+                    
+                    If UBound(timePair) = 1 Then
+                        ' 标准化时间格式
+                        result(resultIndex) = StandardizeTime(Trim(timePair(0)))
+                        result(resultIndex + 1) = StandardizeTime(Trim(timePair(1)))
+                        resultIndex = resultIndex + 2
+                    End If
+                End If
+            Next i
+            
+            ExtractTimePairs = result
+        End If
+    End If
+End Function
+
+Private Function StandardizeTime(timeStr As String) As String
+    ' 如果输入是单个数字，添加前导零和":00"
+    If Len(timeStr) = 1 And IsNumeric(timeStr) Then
+        timeStr = "0" & timeStr & ":00"
+    ' 如果输入是两个数字，直接添加":00"
+    ElseIf Len(timeStr) = 2 And IsNumeric(timeStr) Then
+        timeStr = timeStr & ":00"
+    ' 如果输入已经包含冒号，但小时部分是单个数字
+    ElseIf InStr(timeStr, ":") > 0 Then
+        Dim parts() As String
+        parts = Split(timeStr, ":")
+        If Len(parts(0)) = 1 Then
+            timeStr = "0" & timeStr
+        End If
+    End If
+    
+    ' 如果只有小时数，添加":00"
+    If InStr(timeStr, ":") = 0 Then
+        If Len(timeStr) = 1 Then
+            timeStr = "0" & timeStr & ":00"
+        Else
+            timeStr = timeStr & ":00"
+        End If
+    End If
+    
+    StandardizeTime = timeStr
+End Function
+
+Private Sub FillTimeSlot(ws As Worksheet, monthNum As Integer, _
+                        startTimeStr As String, endTimeStr As String, timeType As Integer)
+    ' 处理开始时间
+    Dim startHour As Long
+    On Error Resume Next
+    startHour = CLng(Split(startTimeStr, ":")(0))
+    If Err.Number <> 0 Then
+        startHour = 0
+        On Error GoTo 0
+    End If
+    On Error GoTo 0
+    
+    ' 处理结束时间
+    Dim endHour As Long
+    On Error Resume Next
+    If InStr(endTimeStr, ":") > 0 Then
+        endHour = CLng(Split(endTimeStr, ":")(0))
+    Else
+        endHour = CLng(endTimeStr)
+    End If
+    If Err.Number <> 0 Then
+        endHour = 24
+        On Error GoTo 0
+    End If
+    On Error GoTo 0
+    
+    ' 处理跨天的情况
+    If endHour < startHour Then
+        endHour = endHour + 24
+    End If
+    
+    ' 确保时间在有效范围内
+    If startHour < 0 Then startHour = 0
+    If endHour > 24 Then endHour = 24
+    
+    ' 填充时间段
+    Dim hour As Long
+    For hour = startHour To endHour - 1
+        Dim targetHour As Long
+        targetHour = hour
+        If targetHour >= 24 Then targetHour = targetHour - 24
+        
+        ' 确保月份在1-12范围内
+        Dim targetMonth As Long
+        targetMonth = monthNum
+        If targetMonth < 1 Then targetMonth = 12
+        If targetMonth > 12 Then targetMonth = 1
+        
+        ' 确保单元格索引在有效范围内
+        If targetMonth >= 1 And targetMonth <= 12 And targetHour >= 0 And targetHour <= 23 Then
+            ws.Cells(targetMonth + 16, targetHour + 4).Value = timeType
+        End If
+    Next hour
+End Sub
+
+Sub CreateTimeTable()
+    Dim ws As Worksheet
+    
+    ' 检查是否存在"时段表"工作表
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("时段表")
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add
+        ws.Name = "时段表"
+    End If
+    On Error GoTo 0
+    
+    ' 清除工作表内容
+    ws.Cells.Clear
+    
+    ' 设置列标题（小时）
+    For i = 0 To 23
+        ws.Cells(1, i + 2).Value = "'" & i & "-" & (i + 1)
+        ws.Cells(1, i + 2).HorizontalAlignment = xlCenter
+    Next i
+    
+    ' 设置月份
+    For i = 1 To 12
+        ws.Cells(i + 1, 1).Value = i & "月"
+    Next i
+    
+    ' 添加图例
+    ws.Cells(15, 1).Value = "图例说明："
+    ws.Cells(16, 1).Value = "尖峰时段"
+    ws.Cells(17, 1).Value = "高峰时段"
+    ws.Cells(18, 1).Value = "平时段"
+    ws.Cells(19, 1).Value = "低谷时段"
+    
+    ' 设置图例颜色
+    ws.Cells(16, 2).Interior.ColorIndex = 46 ' 橙色
+    ws.Cells(17, 2).Interior.ColorIndex = 6  ' 黄色
+    ws.Cells(18, 2).Interior.ColorIndex = 33 ' 蓝色
+    ws.Cells(19, 2).Interior.ColorIndex = 35 ' 绿色
+    
+    ' 添加配置区域标题
+    ws.Cells(15, 4).Value = "时段状态配置（1=尖峰,2=高峰,3=平段,4=低谷）："
+    
+    ' 添加配置表格的列标题
+    For i = 0 To 23
+        ws.Cells(16, i + 4).Value = "'" & i & "-" & (i + 1)
+        ws.Cells(16, i + 4).HorizontalAlignment = xlCenter
+    Next i
+    
+    ' 添加配置表格的月份
+    For i = 1 To 12
+        ws.Cells(i + 16, 3).Value = i & "月"
+    Next i
+    
+    ' 添加数据验证到配置区域
+    Dim configRange As Range
+    Set configRange = ws.Range(ws.Cells(17, 4), ws.Cells(28, 27))
+    
+    With configRange.Validation
+        .Delete
+        .Add Type:=xlValidateWholeNumber, AlertStyle:=xlValidAlertStop, _
+             Operator:=xlBetween, Formula1:="1", Formula2:="4"
+        .ErrorMessage = "请输入1-4之间的数字(1=尖峰,2=高峰,3=平段,4=低谷)"
+    End With
+    
+    ' 设置表格边框
+    ws.Range(ws.Cells(1, 1), ws.Cells(13, 25)).Borders.LineStyle = xlContinuous
+    configRange.Borders.LineStyle = xlContinuous
+End Sub
+
+Sub UpdateConfig()
+    Dim ws As Worksheet
+    
+    ' 检查是否存在"时段表"工作表
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("时段表")
+    If ws Is Nothing Then
+        MsgBox "未找到时段表，请先运行CreateTimeTable创建表格！"
+        Exit Sub
+    End If
+    On Error GoTo 0
+    
+    ' 遍历配置区域并更新颜色
+    Dim i As Integer, j As Integer
+    For i = 1 To 12  ' 12个月
+        For j = 0 To 23  ' 24小时
+            ' 读取配置值
+            If Not IsEmpty(ws.Cells(i + 16, j + 4)) Then
+                Select Case ws.Cells(i + 16, j + 4).Value
+                    Case 1 ' 尖峰
+                        ws.Cells(i + 1, j + 2).Interior.ColorIndex = 46
+                    Case 2 ' 高峰
+                        ws.Cells(i + 1, j + 2).Interior.ColorIndex = 6
+                    Case 3 ' 平段
+                        ws.Cells(i + 1, j + 2).Interior.ColorIndex = 33
+                    Case 4 ' 低谷
+                        ws.Cells(i + 1, j + 2).Interior.ColorIndex = 35
+                End Select
+            End If
+        Next j
+    Next i
+End Sub
+
+Sub FillConfig()
+' 声明所有变量
+    Dim ws As Worksheet
+    Dim i As Long        ' 通用循环变量
+    Dim rowNum As Long   ' 行号变量
+    Dim hourNum As Long  ' 小时变量
+    
+    ' 检查是否存在"时段表"工作表
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("时段表")
+    If ws Is Nothing Then
+        MsgBox "未找到时段表，请先运行CreateTimeTable创建表格！"
+        Exit Sub
+    End If
+    On Error GoTo 0
+    
+    ' 清除配置区域
+    ws.Range(ws.Cells(17, 4), ws.Cells(28, 27)).ClearContents
+    
+    ' 遍历每个月份
+    For i = 1 To 12     ' 使用 i 作为循环变量
+        ' 获取行号
+        rowNum = i + 16
+        
+        ' 冬季 (12,1,2月)
+        If i = 12 Or i <= 2 Then
+            ' 低谷时段：0:00-8:00
+            For hourNum = 0 To 7
+                ws.Cells(rowNum, hourNum + 4).Value = LOW
+            Next hourNum
+            
+            ' 平段：8:00-10:00
+            For hourNum = 8 To 9
+                ws.Cells(rowNum, hourNum + 4).Value = NORMAL
+            Next hourNum
+            
+            ' 高峰时段：10:00-12:00
+            For hourNum = 10 To 11
+                ws.Cells(rowNum, hourNum + 4).Value = HIGH
+            Next hourNum
+            
+            ' 平段：12:00-16:00
+            For hourNum = 12 To 15
+                ws.Cells(rowNum, hourNum + 4).Value = NORMAL
+            Next hourNum
+            
+            ' 高峰时段：16:00-22:00
+            For hourNum = 16 To 21
+                ws.Cells(rowNum, hourNum + 4).Value = HIGH
+            Next hourNum
+            
+            ' 平段：22:00-24:00
+            For hourNum = 22 To 23
+                ws.Cells(rowNum, hourNum + 4).Value = NORMAL
+            Next hourNum
+            
+        ' 夏季 (7,8,9月)
+        ElseIf i >= 7 And i <= 9 Then
+            ' 低谷时段：1:00-7:00
+            For hourNum = 1 To 6
+                ws.Cells(rowNum, hourNum + 4).Value = LOW
+            Next hourNum
+            
+            ' 平段：7:00-11:00
+            For hourNum = 7 To 10
+                ws.Cells(rowNum, hourNum + 4).Value = NORMAL
+            Next hourNum
+            
+            ' 高峰时段：11:00-18:00
+            For hourNum = 11 To 17
+                ws.Cells(rowNum, hourNum + 4).Value = HIGH
+            Next hourNum
+            
+            ' 平段：18:00-20:00
+            For hourNum = 18 To 19
+                ws.Cells(rowNum, hourNum + 4).Value = NORMAL
+            Next hourNum
+            
+            ' 高峰时段：20:00-23:00
+            For hourNum = 20 To 22
+                ws.Cells(rowNum, hourNum + 4).Value = HIGH
+            Next hourNum
+            
+            ' 平段：23:00-24:00
+            ws.Cells(rowNum, 27).Value = NORMAL
+            
+            ' 特殊处理7月和8月的尖峰时段
+            If i <= 8 Then
+                ' 尖峰时段：13:00-14:00，21:00-23:00
+                ws.Cells(rowNum, 17).Value = PEAK  ' 13:00-14:00
+                ws.Cells(rowNum, 25).Value = PEAK  ' 21:00-22:00
+                ws.Cells(rowNum, 26).Value = PEAK  ' 22:00-23:00
+            End If
+            
+        ' 春秋季 (3-6、10、11月)
+        Else
+            ' 低谷时段：22:00-次日8:00
+            For hourNum = 0 To 7
+                ws.Cells(rowNum, hourNum + 4).Value = LOW
+            Next hourNum
+            For hourNum = 22 To 23
+                ws.Cells(rowNum, hourNum + 4).Value = LOW
+            Next hourNum
+            
+            ' 平段：8:00-10:00
+            For hourNum = 8 To 9
+                ws.Cells(rowNum, hourNum + 4).Value = NORMAL
+            Next hourNum
+            
+            ' 高峰时段：10:00-12:00
+            For hourNum = 10 To 11
+                ws.Cells(rowNum, hourNum + 4).Value = HIGH
+            Next hourNum
+            
+            ' 平段：12:00-17:00
+            For hourNum = 12 To 16
+                ws.Cells(rowNum, hourNum + 4).Value = NORMAL
+            Next hourNum
+            
+            ' 高峰时段：17:00-22:00
+            For hourNum = 17 To 21
+                ws.Cells(rowNum, hourNum + 4).Value = HIGH
+            Next hourNum
+        End If
+    Next i               ' 使用 i 作为循环变量
+    
+    ' 自动运行更新
+    Call UpdateConfig
+End Sub
+
+Sub ParseTimeText()
+    Dim ws As Worksheet
+    Dim inputText As String
+    Dim lines() As String
+    Dim currentRow As Long
+    Dim debugRow As Long
+    Dim currentSeason As String
+    Dim currentMonths As String
+    Dim line As String
+    Dim i As Long
+    Dim hasTimeInfo As Boolean
+    Dim timeType As String
+    Dim continueInput As Boolean
+    
+    ' 创建一个新的工作表来存储解析结果
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("解析结果")
+    If ws Is Nothing Then
+        Set ws = ThisWorkbook.Worksheets.Add
+        ws.Name = "解析结果"
+    End If
+    On Error GoTo 0
+    
+    ' 如果工作表已存在数据，找到最后一行
+    currentRow = ws.Cells(ws.Rows.Count, 1).End(xlUp).row
+    If currentRow = 1 Then
+        ' 工作表为空，清除内容并设置表头
+        ws.Cells.Clear
+        ws.Cells(1, 1).Value = "季节"
+        ws.Cells(1, 2).Value = "月份"
+        ws.Cells(1, 3).Value = "时段类型"
+        ws.Cells(1, 4).Value = "开始时间"
+        ws.Cells(1, 5).Value = "结束时间"
+        ws.Cells(1, 6).Value = "Debug Info"
+        currentRow = 2
+    Else
+        ' 工作表已有数据，从最后一行继续
+        currentRow = currentRow + 1
+    End If
+    
+    debugRow = ws.Cells(ws.Rows.Count, 6).End(xlUp).row + 1
+    
+    ' 循环获取用户输入
+    Do
+        ' 获取用户输入的文本
+        inputText = InputBox("请粘贴需要解析的文本（如果已完成所有粘贴，请直接点击取消按钮）：", "文本解析")
+        
+        If inputText = "" Then
+            Exit Do
+        End If
+        
+        ' 预处理文本
+        inputText = Replace(inputText, vbCrLf, vbLf)
+        inputText = Replace(inputText, vbCr, vbLf)
+        
+        ' 标准化换行符
+        While InStr(inputText, vbLf & vbLf) > 0
+            inputText = Replace(inputText, vbLf & vbLf, vbLf)
+        Wend
+        
+        ' 按行分割文本
+        lines = Split(inputText, vbLf)
+        
+        ' 记录原始文本
+        ws.Cells(debugRow, 6).Value = "新输入文本，总行数: " & UBound(lines) + 1
+        debugRow = debugRow + 1
+        
+        ' 处理每一行
+        For i = 0 To UBound(lines)
+            line = Trim(lines(i))
+            
+            ' 记录原始行内容
+            If line <> "" Then
+                ws.Cells(debugRow, 6).Value = "原始行 " & (i + 1) & ": " & line
+                debugRow = debugRow + 1
+                
+                ' 检查是否是季节行
+                If InStr(line, "春秋季") > 0 Or InStr(line, "夏季") > 0 Or InStr(line, "冬季") > 0 Then
+                    ' 更新当前季节
+                    If InStr(line, "春秋季") > 0 Then
+                        ' 先处理春季
+                        currentSeason = "春季"
+                        currentMonths = "3、4、5、6"
+                        
+                        ' 记录春季信息
+                        ws.Cells(debugRow, 6).Value = "当前季节更新为: " & currentSeason & ", 月份: " & currentMonths
+                        debugRow = debugRow + 1
+                        
+                        ' 获取时段类型
+                        timeType = ""
+                        If InStr(line, "尖峰") > 0 Then
+                            timeType = "尖峰"
+                        ElseIf InStr(line, "高峰") > 0 Then
+                            timeType = "高峰"
+                        ElseIf InStr(line, "平段") > 0 Then
+                            timeType = "平段"
+                        ElseIf InStr(line, "低谷") > 0 Then
+                            timeType = "低谷"
+                        End If
+                        
+                        ' 检查是否包含时段信息
+                        hasTimeInfo = (InStr(line, "时段") > 0 Or InStr(line, "平段") > 0) And _
+                                     (InStr(line, ":") > 0 Or InStr(line, "：") > 0)
+                        
+                        ' 处理春季时段信息
+                        If hasTimeInfo And timeType <> "" Then
+                            Call ProcessTimeSlot(ws, line, currentSeason, currentMonths, timeType, currentRow, debugRow)
+                        End If
+                        
+                        ' 解析后续行以获取更多春季信息
+                        Dim nextLine As String
+                        Dim j As Long
+                        For j = i + 1 To UBound(lines)
+                            nextLine = Trim(lines(j))
+                            If nextLine <> "" Then
+                                ' 检查是否包含时段信息
+                                hasTimeInfo = (InStr(nextLine, "时段") > 0 Or InStr(nextLine, "平段") > 0) And _
+                                             (InStr(nextLine, ":") > 0 Or InStr(nextLine, "：") > 0)
+                                
+                                If hasTimeInfo Then
+                                    ' 获取时段类型
+                                    timeType = ""
+                                    If InStr(nextLine, "尖峰") > 0 Then
+                                        timeType = "尖峰"
+                                    ElseIf InStr(nextLine, "高峰") > 0 Then
+                                        timeType = "高峰"
+                                    ElseIf InStr(nextLine, "平段") > 0 Then
+                                        timeType = "平段"
+                                    ElseIf InStr(nextLine, "低谷") > 0 Then
+                                        timeType = "低谷"
+                                    End If
+                                    
+                                    ' 处理春季时段信息
+                                    If timeType <> "" Then
+                                        Call ProcessTimeSlot(ws, nextLine, currentSeason, currentMonths, timeType, currentRow, debugRow)
+                                    End If
+                                End If
+                            End If
+                        Next j
+                        
+                        ' 再处理秋季
+                        currentSeason = "秋季"
+                        currentMonths = "10、11"
+                        
+                        ' 记录秋季信息
+                        ws.Cells(debugRow, 6).Value = "当前季节更新为: " & currentSeason & ", 月份: " & currentMonths
+                        debugRow = debugRow + 1
+                        
+                        ' 处理秋季时段信息
+                        If hasTimeInfo And timeType <> "" Then
+                            Call ProcessTimeSlot(ws, line, currentSeason, currentMonths, timeType, currentRow, debugRow)
+                        End If
+                        
+                    ElseIf InStr(line, "夏季") > 0 Then
+                        currentSeason = "夏季"
+                        currentMonths = "7、8、9"
+                    ElseIf InStr(line, "冬季") > 0 Then
+                        currentSeason = "冬季"
+                        currentMonths = "12、1、2"
+                        
+                        ' 记录冬季信息
+                        ws.Cells(debugRow, 6).Value = "当前季节更新为: " & currentSeason & ", 月份: " & currentMonths
+                        debugRow = debugRow + 1
+                        
+                        ' 获取时段类型
+                        timeType = ""
+                        If InStr(line, "尖峰") > 0 Then
+                            timeType = "尖峰"
+                        ElseIf InStr(line, "高峰") > 0 Then
+                            timeType = "高峰"
+                        ElseIf InStr(line, "平段") > 0 Then
+                            timeType = "平段"
+                        ElseIf InStr(line, "低谷") > 0 Then
+                            timeType = "低谷"
+                        End If
+                        
+                        ' 检查是否包含时段信息
+                        hasTimeInfo = (InStr(line, "时段") > 0 Or InStr(line, "平段") > 0) And _
+                                     (InStr(line, ":") > 0 Or InStr(line, "：") > 0)
+                        
+                        ' 处理冬季时段信息
+                        If hasTimeInfo And timeType <> "" Then
+                            Call ProcessTimeSlot(ws, line, currentSeason, currentMonths, timeType, currentRow, debugRow)
+                        End If
+                        
+                        ' 解析后续行以获取更多冬季信息
+                        Dim winterNextLine As String
+                        Dim k As Long
+                        For k = i + 1 To UBound(lines)
+                            winterNextLine = Trim(lines(k))
+                            If winterNextLine <> "" Then
+                                ' 检查是否包含时段信息
+                                hasTimeInfo = (InStr(winterNextLine, "时段") > 0 Or InStr(winterNextLine, "平段") > 0) And _
+                                             (InStr(winterNextLine, ":") > 0 Or InStr(winterNextLine, "：") > 0)
+                                
+                                If hasTimeInfo Then
+                                    ' 获取时段类型
+                                    timeType = ""
+                                    If InStr(winterNextLine, "尖峰") > 0 Then
+                                        timeType = "尖峰"
+                                    ElseIf InStr(winterNextLine, "高峰") > 0 Then
+                                        timeType = "高峰"
+                                    ElseIf InStr(winterNextLine, "平段") > 0 Then
+                                        timeType = "平段"
+                                    ElseIf InStr(winterNextLine, "低谷") > 0 Then
+                                        timeType = "低谷"
+                                    End If
+                                    
+                                    ' 处理冬季时段信息
+                                    If timeType <> "" Then
+                                        Call ProcessTimeSlot(ws, winterNextLine, currentSeason, currentMonths, timeType, currentRow, debugRow)
+                                    End If
+                                End If
+                            End If
+                        Next k
+                    End If
+                    ws.Cells(debugRow, 6).Value = "当前季节更新为: " & currentSeason & ", 月份: " & currentMonths
+                    debugRow = debugRow + 1
+                End If
+                
+                ' 解析时段
+                If currentSeason <> "" Then
+                    ' 检查是否包含时段信息
+                    hasTimeInfo = (InStr(line, "时段") > 0 Or InStr(line, "平段") > 0) And _
+                                 (InStr(line, ":") > 0 Or InStr(line, "：") > 0)
+                    
+                    If hasTimeInfo Then
+                        ws.Cells(debugRow, 6).Value = "开始处理时段行，当前季节: " & currentSeason
+                        debugRow = debugRow + 1
+                        
+                        ' 获取时段类型
+                        timeType = ""
+                        If InStr(line, "尖峰") > 0 Then
+                            timeType = "尖峰"
+                        ElseIf InStr(line, "高峰") > 0 Then
+                            timeType = "高峰"
+                        ElseIf InStr(line, "平段") > 0 Then
+                            timeType = "平段"
+                        ElseIf InStr(line, "低谷") > 0 Then
+                            timeType = "低谷"
+                        End If
+                        
+                        ' 记录时段行
+                        ws.Cells(debugRow, 6).Value = "识别到时段类型: " & timeType & ", 行内容: " & line
+                        debugRow = debugRow + 1
+                        
+                        ' 处理时段信息
+                        If timeType <> "" Then
+                            Call ProcessTimeSlot(ws, line, currentSeason, currentMonths, timeType, currentRow, debugRow)
+                        End If
+                    End If
+                End If
+            End If
+        Next i
+        
+        ' 询问是否继续输入
+        continueInput = MsgBox("是否还有更多文本需要粘贴？", vbYesNo + vbQuestion, "继续输入") = vbYes
+    Loop While continueInput
+    
+    ' 自动调整列宽
+    ws.Columns("A:F").AutoFit
+    
+    MsgBox "文本解析完成！结果已保存在'解析结果'工作表中。", vbInformation
+End Sub
+
+Sub ConvertToTimeConfig()
+    Dim wsSource As Worksheet
+    Dim wsTarget As Worksheet
+    
+    ' 获取工作表
+    On Error Resume Next
+    Set wsSource = ThisWorkbook.Worksheets("解析结果")
+    Set wsTarget = ThisWorkbook.Worksheets("时段表")
+    
+    If wsSource Is Nothing Then
+        MsgBox "未找到'解析结果'工作表！", vbExclamation
+        Exit Sub
+    End If
+    If wsTarget Is Nothing Then
+        MsgBox "未找到'时段表'工作表！请先创建时段表。", vbExclamation
+        Exit Sub
+    End If
+    On Error GoTo 0
+    
+    ' 清除配置区域
+    wsTarget.Range(wsTarget.Cells(17, 4), wsTarget.Cells(28, 27)).ClearContents
+    
+    ' 设置默认值为平段(3)
+    wsTarget.Range(wsTarget.Cells(17, 4), wsTarget.Cells(28, 27)).Value = 3
+    
+    ' 遍历解析结果
+    Dim lastRow As Long
+    lastRow = wsSource.Cells(wsSource.Rows.Count, 1).End(xlUp).row
+    
+    ' 验证数据是否为空
+    If lastRow <= 1 Then
+        MsgBox "没有找到有效的时段数据！", vbExclamation
+        Exit Sub
+    End If
+    
+    Dim row As Long
+    For row = 2 To lastRow
+        ' 获取时段类型
+        Dim timeType As Integer
+        Select Case wsSource.Cells(row, 3).Value
+            Case "尖峰": timeType = 1
+            Case "高峰": timeType = 2
+            Case "平段": timeType = 3
+            Case "低谷": timeType = 4
+            Case Else: timeType = 3  ' 默认为平段
+        End Select
+        
+        ' 处理月份
+        Dim monthText As String
+        monthText = Replace(Replace(wsSource.Cells(row, 2).Value, "月", ""), " ", "")
+        
+        If monthText = "" Then
+            ' 如果月份为空，根据季节自动填充月份
+            Select Case wsSource.Cells(row, 1).Value
+                Case "春季": monthText = "3、4、5、6"
+                Case "夏季": monthText = "7、8、9"
+                Case "秋季": monthText = "10、11"
+                Case "冬季": monthText = "12、1、2"
+            End Select
+        End If
+        
+        ' 分割月份（处理多个月份组）
+        Dim monthGroups() As String
+        monthGroups = Split(monthText, "、")
+        
+        Dim monthGroup As Variant
+        For Each monthGroup In monthGroups
+            ' 检查是否是月份范围
+            If InStr(monthGroup, "-") > 0 Then
+                Dim monthRange() As String
+                monthRange = Split(monthGroup, "-")
+                
+                ' 处理月份范围
+                Dim startMonth As Integer, endMonth As Integer
+                startMonth = CInt(Trim(monthRange(0)))
+                endMonth = CInt(Trim(monthRange(1)))
+                
+                ' 填充范围内的每个月
+                Dim m As Integer
+                For m = startMonth To endMonth
+                    Call FillTimeSlot(wsTarget, m, wsSource.Cells(row, 4).Value, _
+                                    wsSource.Cells(row, 5).Value, timeType)
+                Next m
+            Else
+                ' 处理单个月份
+                Dim singleMonth As Integer
+                singleMonth = CInt(Trim(monthGroup))
+                Call FillTimeSlot(wsTarget, singleMonth, wsSource.Cells(row, 4).Value, _
+                                wsSource.Cells(row, 5).Value, timeType)
+            End If
+        Next monthGroup
+    Next row
+    
+    ' 验证结果
+    Dim hasEmptyCell As Boolean
+    hasEmptyCell = False
+    
+    Dim i As Long, j As Long
+    For i = 17 To 28
+        For j = 4 To 27
+            If IsEmpty(wsTarget.Cells(i, j)) Or wsTarget.Cells(i, j).Value = 0 Then
+                wsTarget.Cells(i, j).Value = 3  ' 设置为平段
+                hasEmptyCell = True
+            End If
+        Next j
+    Next i
+    
+    If hasEmptyCell Then
+        MsgBox "注意：部分时段未定义，已自动设置为平段。", vbInformation
+    End If
+    
+    ' 更新颜色
+    Call UpdateConfig
+    
+    MsgBox "时段配置表已更新！", vbInformation
+End Sub
+
+Private Sub ProcessTimeSlot(ByVal ws As Worksheet, ByVal line As String, ByVal season As String, _
+                            ByVal months As String, ByVal timeType As String, ByRef currentRow As Long, ByRef debugRow As Long)
+    ' 提取时间段
+    Dim timePairs() As String
+    timePairs = ExtractTimePairs(line)
+    
+    ' 检查数组是否为空
+    If Not IsEmpty(timePairs) Then
+        ' 检查数组是否已初始化
+        If Not IsArray(timePairs) Then
+            ws.Cells(debugRow, 6).Value = "时间段数组未初始化"
+            debugRow = debugRow + 1
+        Else
+            ' 检查数组是否有元素
+            On Error Resume Next
+            Dim arrayLength As Long
+            arrayLength = UBound(timePairs)
+            If Err.Number <> 0 Then
+                ws.Cells(debugRow, 6).Value = "时间段数组为空"
+                debugRow = debugRow + 1
+            Else
+                On Error GoTo 0
+                
+                If arrayLength >= 1 Then  ' 确保至少有一对时间
+                    ws.Cells(debugRow, 6).Value = "成功提取时间段，数组长度: " & (arrayLength + 1)
+                    debugRow = debugRow + 1
+                    
+                    ' 分割月份并为每个月份创建单独的行
+                    Dim monthArray() As String
+                    monthArray = Split(months, "、")
+                    
+                    Dim k As Long
+                    For k = 0 To arrayLength - 1 Step 2
+                        If k + 1 <= arrayLength Then  ' 确保有结束时间
+                            ' 为每个月份创建一行记录
+                            Dim m As Long
+                            For m = 0 To UBound(monthArray)
+                                ws.Cells(currentRow, 1).Value = season
+                                ws.Cells(currentRow, 2).Value = monthArray(m)
+                                ws.Cells(currentRow, 3).Value = timeType
+                                ws.Cells(currentRow, 4).Value = timePairs(k)
+                                ws.Cells(currentRow, 5).Value = timePairs(k + 1)
+                                ws.Cells(debugRow, 6).Value = "添加记录: " & season & " 月份:" & monthArray(m) & " " & timeType & " " & timePairs(k) & "-" & timePairs(k + 1)
+                                debugRow = debugRow + 1
+                                currentRow = currentRow + 1
+                            Next m
+                        End If
+                    Next k
+                Else
+                    ws.Cells(debugRow, 6).Value = "时间段数组长度不足"
+                    debugRow = debugRow + 1
+                End If
+            End If
+        End If
+    Else
+        ws.Cells(debugRow, 6).Value = "未能提取到时间段，原始行: " & line
+        debugRow = debugRow + 1
+    End If
+End Sub
+
+

@@ -1,0 +1,61 @@
+<view class="container">
+  <!-- 服务分类 -->
+  <view class="service-grid">
+    <view class="grid-item" wx:for="{{services}}" wx:key="id" bindtap="navigateToService" data-id="{{item.id}}">
+      <text>{{item.name}}</text>
+      <text class="price">¥{{item.price}}</text>
+    </view>
+  </view>
+
+  <!-- 每日运势提示 -->
+  <view class="daily-fortune">
+    <view class="section-title">今日运势提示</view>
+    <view class="fortune-content">
+      <text>{{dailyFortune.content}}</text>
+      <view class="fortune-tips">
+        <view class="tip-item">
+          <text class="label">吉利方位：</text>
+          <text class="value">{{dailyFortune.direction}}</text>
+        </view>
+        <view class="tip-item">
+          <text class="label">幸运颜色：</text>
+          <text class="value">{{dailyFortune.color}}</text>
+        </view>
+        <view class="tip-item">
+          <text class="label">幸运数字：</text>
+          <text class="value">{{dailyFortune.number}}</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 咨询师推荐 -->
+  <view class="consultant-section">
+    <view class="section-title">推荐咨询师</view>
+    <scroll-view scroll-x="true" class="consultant-scroll">
+      <view class="consultant-card" wx:for="{{consultants}}" wx:key="id" bindtap="showConsultantDetail" data-id="{{item.id}}">
+        <text class="consultant-name">{{item.name}}</text>
+        <text class="consultant-title">{{item.title}}</text>
+        <view class="consultant-rating">
+          <text class="rating-score">{{item.rating}}</text>
+          <text class="rating-count">{{item.consultCount}}次咨询</text>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- 用户评价 -->
+  <view class="reviews-section">
+    <view class="section-title">用户好评</view>
+    <view class="review-card" wx:for="{{reviews}}" wx:key="id">
+      <view class="review-header">
+        <view class="review-info">
+          <text class="review-name">{{item.userName}}</text>
+          <text class="review-date">{{item.date}}</text>
+        </view>
+        <view class="review-rating">{{item.rating}}分</view>
+      </view>
+      <text class="review-content">{{item.content}}</text>
+    </view>
+  </view>
+</view> 

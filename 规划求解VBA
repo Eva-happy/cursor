@@ -1,0 +1,22 @@
+Option Explicit
+
+Sub 退出股东权益折现率边界求解()
+    ' 获取目标值（绝对值）
+    Dim targetCell As Range
+    Dim absoluteValueCell As Range
+    Dim targetValue As Double
+    
+    Set absoluteValueCell = Range("C154")
+    targetValue = Abs(absoluteValueCell.Value)
+
+    SolverOk SetCell:="$C$153", MaxMinVal:=3, ValueOf:=targetValue, ByChange:= _
+        "$C$152", Engine:=1, EngineDesc:="GRG Nonlinear"
+    SolverOk SetCell:="$C$153", MaxMinVal:=3, ValueOf:=1084.50021287893, ByChange:= _
+        "$C$152", Engine:=1, EngineDesc:="GRG Nonlinear"
+    SolverSolve
+    
+    Range("D153").Select
+    ActiveWindow.SmallScroll Down:=138
+End Sub
+
+

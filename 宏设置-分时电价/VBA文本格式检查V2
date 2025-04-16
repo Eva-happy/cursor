@@ -1,0 +1,56 @@
+Sub ConvertToTimeConfig()
+    Dim wsSource As Worksheet, wsSingle As Worksheet, wsMulti As Worksheet
+    
+    ' 获取工作表
+    On Error Resume Next
+    Set wsSource = ThisWorkbook.Worksheets("解析结果")
+    
+    ' 检查工作表是否存在
+    If wsSource Is Nothing Then
+        MsgBox "未找到'解析结果'工作表！", vbExclamation
+        Exit Sub
+    End If
+    On Error GoTo 0
+    
+    ' 清除或创建单个地区时段表
+    On Error Resume Next
+    Set wsSingle = ThisWorkbook.Worksheets("单个地区时段表")
+    If wsSingle Is Nothing Then
+        Set wsSingle = ThisWorkbook.Worksheets.Add
+        wsSingle.Name = "单个地区时段表"
+    Else
+        ' 清除现有内容
+        wsSingle.Cells.Clear
+        ' 删除所有按钮
+        Dim btn As Button
+        For Each btn In wsSingle.Buttons
+            btn.Delete
+        Next btn
+    End If
+    wsSingle.Tab.ColorIndex = 50 ' 设置为青绿色
+    
+    ' 清除或创建多个地区时段表
+    Set wsMulti = ThisWorkbook.Worksheets("多个地区时段表")
+    If wsMulti Is Nothing Then
+        Set wsMulti = ThisWorkbook.Worksheets.Add
+        wsMulti.Name = "多个地区时段表"
+    Else
+        ' 清除现有内容
+        wsMulti.Cells.Clear
+        ' 删除所有按钮
+        For Each btn In wsMulti.Buttons
+            btn.Delete
+        Next btn
+    End If
+    wsMulti.Tab.ColorIndex = 50 ' 设置为青绿色
+    
+    On Error GoTo 0
+    
+    ' 创建单个地区时段表模板（空白）
+    Call CreateSingleRegionTemplate(wsSingle)
+    
+    ' 创建多个地区时段表模板并填充数据
+    Call CreateMultiRegionTemplate(wsMulti)
+    
+    ' ... existing code ...
+End Sub 

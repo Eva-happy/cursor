@@ -1,0 +1,159 @@
+Sub CreateTimeOfUsePricingCharts()
+    On Error Resume Next
+    
+    ' 获取当前工作表
+    Dim wsSingle As Worksheet
+    Set wsSingle = ActiveSheet
+    If wsSingle Is Nothing Then
+        MsgBox "无法获取当前工作表", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 获取选中的地区
+    Dim selectedRegion As String
+    selectedRegion = wsSingle.Range("A1").Value
+    If selectedRegion = "" Then
+        MsgBox "请先选择地区", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 获取源数据工作表
+    Dim wsSource As Worksheet
+    Set wsSource = ThisWorkbook.Sheets("解析结果")
+    If wsSource Is Nothing Then
+        MsgBox "未找到解析结果工作表", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 获取最后一行
+    Dim lastRow As Long
+    lastRow = wsSource.Cells(wsSource.Rows.Count, "A").End(xlUp).Row
+    
+    ' 创建或激活分时电价时段柱状图工作表
+    Dim wsChart As Worksheet
+    On Error Resume Next
+    Set wsChart = ThisWorkbook.Sheets("分时电价时段柱状图")
+    On Error GoTo 0
+    
+    Application.ScreenUpdating = False
+    
+    If wsChart Is Nothing Then
+        Set wsChart = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+        wsChart.Name = "分时电价时段柱状图"
+    Else
+        wsChart.Cells.Clear
+        wsChart.ChartObjects.Delete
+    End If
+    
+    ' 在A1单元格显示地区名称
+    wsChart.Range("A1").Value = "地区：" & selectedRegion
+    
+    ' 定义时段高度
+    Const DEEP_VALLEY_HEIGHT As Double = 0.2
+    Const VALLEY_HEIGHT As Double = 0.4
+    Const FLAT_HEIGHT As Double = 0.6
+    Const PEAK_HEIGHT As Double = 0.8
+    Const SHARP_PEAK_HEIGHT As Double = 1#
+    
+    ' 循环处理12个月份
+    Dim monthNum As Integer
+    Dim chartTop As Long
+    chartTop = 50
+    
+    ' 处理每个月份
+    For monthNum = 1 To 12
+        ' 创建数据区域
+        Dim dataRange As Range
+        Set dataRange = wsChart.Range(wsChart.Cells(chartTop, 1), wsChart.Cells(chartTop + 1, 25))
+        
+        ' 填充时间标签
+        Dim hour As Integer
+        For hour = 0 To 23
+            dataRange.Cells(1, hour + 2).Value = hour & "-" & (hour + 1)
+        Next hour
+        
+        ' 获取该月的时段数据
+        Dim timeSlotRange As Range
+        Set timeSlotRange = wsSingle.Range(wsSingle.Cells(monthNum + 1, 2), wsSingle.Cells(monthNum + 1, 25))
+        
+        ' 填充高度数据
+        Dim colIndex As Integer
+        For colIndex = 1 To 24
+            Select Case timeSlotRange.Cells(1, colIndex).Interior.Color
+                Case RGB(255, 192, 0)    ' 尖峰
+                    dataRange.Cells(2, colIndex + 1).Value = SHARP_PEAK_HEIGHT
+                Case RGB(255, 192, 203)   ' 高峰
+                    dataRange.Cells(2, colIndex + 1).Value = PEAK_HEIGHT
+                Case RGB(189, 215, 238)   ' 平段
+                    dataRange.Cells(2, colIndex + 1).Value = FLAT_HEIGHT
+                Case RGB(198, 239, 206)   ' 低谷
+                    dataRange.Cells(2, colIndex + 1).Value = VALLEY_HEIGHT
+                Case RGB(0, 112, 192)     ' 深谷
+                    dataRange.Cells(2, colIndex + 1).Value = DEEP_VALLEY_HEIGHT
+            End Select
+        Next colIndex
+        
+        ' 创建柱状图
+        Dim chartObj As ChartObject
+        Set chartObj = wsChart.ChartObjects.Add(Left:=50, Top:=chartTop, Width:=600, Height:=300)
+        
+        With chartObj.Chart
+            .ChartType = xlColumnClustered
+            .SetSourceData Source:=dataRange
+            .HasTitle = True
+            .ChartTitle.text = monthNum & "月分时电价时段柱状图"
+            
+            ' 设置柱状图颜色
+            Dim i As Integer
+            For i = 1 To .SeriesCollection(1).Points.Count
+                Select Case timeSlotRange.Cells(1, i).Interior.Color
+                    Case RGB(255, 192, 0)    ' 尖峰
+                        .SeriesCollection(1).Points(i).Interior.Color = RGB(255, 192, 0)
+                    Case RGB(255, 192, 203)   ' 高峰
+                        .SeriesCollection(1).Points(i).Interior.Color = RGB(255, 192, 203)
+                    Case RGB(189, 215, 238)   ' 平段
+                        .SeriesCollection(1).Points(i).Interior.Color = RGB(189, 215, 238)
+                    Case RGB(198, 239, 206)   ' 低谷
+                        .SeriesCollection(1).Points(i).Interior.Color = RGB(198, 239, 206)
+                    Case RGB(0, 112, 192)     ' 深谷
+                        .SeriesCollection(1).Points(i).Interior.Color = RGB(0, 112, 192)
+                End Select
+            Next i
+            
+            ' 添加图例
+            .HasLegend = True
+            With .Legend
+                .Position = xlBottom
+                
+                ' 创建自定义图例
+                Dim legendRange As Range
+                Set legendRange = wsChart.Range(wsChart.Cells(chartTop + 2, 1), wsChart.Cells(chartTop + 2, 5))
+                legendRange.Interior.ColorIndex = xlNone
+                
+                ' 填充图例数据
+                legendRange.Cells(1, 1).Value = "尖峰"
+                legendRange.Cells(1, 2).Value = "高峰"
+                legendRange.Cells(1, 3).Value = "平段"
+                legendRange.Cells(1, 4).Value = "低谷"
+                legendRange.Cells(1, 5).Value = "深谷"
+                
+                ' 设置图例颜色
+                legendRange.Cells(1, 1).Interior.Color = RGB(255, 192, 0)
+                legendRange.Cells(1, 2).Interior.Color = RGB(255, 192, 203)
+                legendRange.Cells(1, 3).Interior.Color = RGB(189, 215, 238)
+                legendRange.Cells(1, 4).Interior.Color = RGB(198, 239, 206)
+                legendRange.Cells(1, 5).Interior.Color = RGB(0, 112, 192)
+            End With
+        End With
+        
+        chartTop = chartTop + 350
+    Next monthNum
+    
+    ' 调整工作表视图
+    wsChart.Activate
+    ActiveWindow.Zoom = 70
+    
+    Application.ScreenUpdating = True
+    
+    MsgBox "柱状图创建完成！", vbInformation
+End Sub

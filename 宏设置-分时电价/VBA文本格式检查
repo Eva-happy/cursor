@@ -1,0 +1,327 @@
+Option Explicit
+
+' 检查分时电价政策表格式
+Sub CheckTimeTextFormat()
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    Dim i As Long
+    Dim errorMessages As String
+    Dim hasError As Boolean
+    Dim line As String
+    Dim monthFound As Boolean
+    Dim timeSlotFound As Boolean
+    Dim currentRegion As String
+    
+    ' 检查是否存在"分时电价政策表"工作表
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("分时电价政策表")
+    If ws Is Nothing Then
+        MsgBox "未找到'分时电价政策表'工作表！请确保工作表名称正确。", vbExclamation
+        Exit Sub
+    End If
+    On Error GoTo 0
+    
+    ' 获取最后一行
+    lastRow = ws.Cells(ws.Rows.Count, "B").End(xlUp).Row
+    If lastRow < 2 Then
+        MsgBox "分时电价政策表中没有数据！请先填写数据。", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 遍历每一行检查格式
+    hasError = False
+    errorMessages = "格式检查发现以下问题：" & vbCrLf & vbCrLf
+    
+    For i = 2 To lastRow
+        ' 检查地区名称（A列）
+        currentRegion = Trim(ws.Cells(i, "A").value)
+        If currentRegion = "" Then
+            hasError = True
+            errorMessages = errorMessages & "第" & i & "行：地区名称为空" & vbCrLf
+        End If
+        
+        ' 检查政策文本（B列）
+        line = Trim(ws.Cells(i, "B").value)
+        If line <> "" Then
+            ' 检查月份格式
+            If Not CheckMonthFormat(line) Then
+                hasError = True
+                errorMessages = errorMessages & "第" & i & "行：月份格式错误。正确格式示例：'月份：1-3月' 或 '(1-3)月' 或 '1、2、3月'" & vbCrLf
+            End If
+            
+            ' 检查时段格式
+            If Not CheckTimeSlotFormat(line) Then
+                hasError = True
+                errorMessages = errorMessages & "第" & i & "行：时段格式错误。应包含以下之一：尖峰时段、高峰时段、平段时段、深谷时段、低谷时段" & vbCrLf
+            End If
+            
+            ' 检查时间格式
+            If Not CheckTimeFormat(line) Then
+                hasError = True
+                errorMessages = errorMessages & "第" & i & "行：时间格式错误。正确格式示例：'8:00-11:00' 或 '22:00-次日8:00'" & vbCrLf
+            End If
+        End If
+    Next i
+    
+    ' 显示检查结果
+    If hasError Then
+        MsgBox errorMessages, vbExclamation, "格式检查结果"
+    Else
+        MsgBox "格式检查通过！" & vbCrLf & vbCrLf & _
+               "请返回'分时电价政策表填写要求'点击解析文字按钮。", vbInformation, "格式检查结果"
+    End If
+End Sub
+
+' 检查月份格式
+Private Function CheckMonthFormat(ByVal text As String) As Boolean
+    Dim regEx As Object
+    Dim monthText As String
+    Dim monthParts() As String
+    Dim monthPart As Variant
+    
+    ' 如果文本包含"月"字才进行检查
+    If InStr(text, "月") > 0 Then
+        ' 预处理：统一分隔符格式
+        text = Replace(text, "，", "、")
+        text = Replace(text, ",", "、")
+        text = Replace(text, "或", "、")
+        
+        monthText = text
+        
+        ' 移除所有格式字符，只保留数字和分隔符
+        monthText = Replace(monthText, "月份：", "")
+        monthText = Replace(monthText, "月", "")
+        monthText = Replace(monthText, "(", "")
+        monthText = Replace(monthText, ")", "")
+        monthText = Replace(monthText, "（", "")
+        monthText = Replace(monthText, "）", "")
+        monthText = Replace(monthText, "[", "")
+        monthText = Replace(monthText, "]", "")
+        monthText = Replace(monthText, "【", "")
+        monthText = Replace(monthText, "】", "")
+        monthText = Replace(monthText, "或", "、")
+        
+        monthParts = Split(monthText, "、")
+        
+        For Each monthPart In monthParts
+            monthPart = Trim(monthPart)
+            If monthPart = "" Then GoTo NextMonth
+            
+            If InStr(monthPart, "-") > 0 Then
+                Dim monthRange() As String
+                monthRange = Split(monthPart, "-")
+                
+                If UBound(monthRange) = 1 Then
+                    If Not (IsNumeric(monthRange(0)) And IsNumeric(monthRange(1))) Then
+                        CheckMonthFormat = False
+                        Exit Function
+                    End If
+                    
+                    ' 检查月份范围
+                    Dim startMonth As Long, endMonth As Long
+                    startMonth = CLng(monthRange(0))
+                    endMonth = CLng(monthRange(1))
+                    
+                    If startMonth < 1 Or startMonth > 12 Or endMonth < 1 Or endMonth > 12 Then
+                        CheckMonthFormat = False
+                        Exit Function
+                    End If
+                End If
+            Else
+                If Not IsNumeric(monthPart) Then
+                    CheckMonthFormat = False
+                    Exit Function
+                End If
+                
+                ' 检查单个月份
+                If CLng(monthPart) < 1 Or CLng(monthPart) > 12 Then
+                    CheckMonthFormat = False
+                    Exit Function
+                End If
+            End If
+NextMonth:
+        Next monthPart
+    End If
+    
+    CheckMonthFormat = True
+End Function
+
+' 检查时段格式
+Private Function CheckTimeSlotFormat(ByVal text As String) As Boolean
+    ' 如果是月份行，直接返回True
+    If InStr(text, "月") > 0 And _
+       (InStr(text, "(") > 0 Or InStr(text, "（") > 0 Or _
+        InStr(text, "[") > 0 Or InStr(text, "【") > 0) Then
+        CheckTimeSlotFormat = True
+        Exit Function
+    End If
+
+    ' 检查是否包含冒号（表示这是一个时段行）
+    If InStr(text, ":") > 0 Or InStr(text, "：") > 0 Then
+        ' 检查是否包含有效的时段类型
+        Dim validTimeSlots As Variant
+        Dim slot As Variant
+        Dim hasValidSlot As Boolean
+        Dim textParts() As String
+        Dim part As Variant
+        
+        ' 支持的分隔符
+        text = Replace(text, "，", ",")
+        text = Replace(text, "、", ",")
+        text = Replace(text, "；", ",")
+        text = Replace(text, ";", ",")
+        
+        ' 分割多个时段
+        textParts = Split(text, ",")
+        
+        ' 只支持带"时段"的写法
+        validTimeSlots = Array("尖峰时段", "高峰时段", "平段时段", "平时段", "平段", "低谷时段", "深谷时段")
+        hasValidSlot = False
+        
+        ' 检查每个分段
+        For Each part In textParts
+            part = Trim(part)
+            If part = "" Then GoTo NextPart
+            
+            For Each slot In validTimeSlots
+                ' 检查每个时段类型
+                If InStr(part, slot & ":") > 0 Or InStr(part, slot & "：") > 0 Then
+                    hasValidSlot = True
+                    Exit For
+                End If
+            Next slot
+            
+            If hasValidSlot Then
+                Exit For
+            End If
+NextPart:
+        Next part
+        
+        ' 如果是时段行（包含冒号），但没有找到有效的时段类型，则返回False
+        If Not hasValidSlot Then
+            CheckTimeSlotFormat = False
+            Exit Function
+        End If
+    End If
+    
+    ' 如果不是时段行，或者是有效的时段行，返回True
+    CheckTimeSlotFormat = True
+End Function
+
+' 检查时间格式
+Private Function CheckTimeFormat(ByVal text As String) As Boolean
+    Dim regEx As Object
+    Dim baseTimePattern As String
+    Dim connectors As String
+    Dim separators As String
+    Dim timeMatches As Object
+    Dim match As Object
+    Dim timeParts() As String
+    Dim hourMin() As String
+    Dim timeRange As Variant
+    Dim timePart As Variant
+    Dim hour As Long
+    Dim minute As Long
+    Dim timeText As String
+    Dim timeRanges() As String
+    Dim slot As Variant
+    Dim timeSlots As Variant
+    
+    Set regEx = CreateObject("VBScript.RegExp")
+    
+    ' 如果文本包含冒号（包括中英文冒号），则进行检查
+    If InStr(text, ":") > 0 Or InStr(text, "：") > 0 Then
+        ' 基本时间格式模式（支持两种冒号）
+        baseTimePattern = "[0-9]{1,2}[:：][0-9]{2}"
+        
+        ' 支持的连接符
+        connectors = "[-—－–─━~至]"  ' 支持 -、—、－、–、─、━、~、至
+        
+        ' 支持的分隔符
+        separators = "[、，,；;]"    ' 支持 、、，、,、；、;
+        
+        ' 预处理文本
+        timeText = text
+        
+        ' 如果文本中包含时段标识，则只检查该时段后面的时间格式
+        timeSlots = Array("尖峰时段", "高峰时段", "平段时段", "平时段", "平段", "低谷时段", "深谷时段", "尖峰时段", "深谷时段")
+        
+        For Each slot In timeSlots
+            If InStr(timeText, slot & ":") > 0 Then
+                timeText = Split(timeText, slot & ":")(1)
+                Exit For
+            ElseIf InStr(timeText, slot & "：") > 0 Then
+                timeText = Split(timeText, slot & "：")(1)
+                Exit For
+            End If
+        Next slot
+        
+        ' 统一格式
+        timeText = Replace(timeText, "，", ",")
+        timeText = Replace(timeText, "、", ",")
+        timeText = Replace(timeText, "；", ",")
+        timeText = Replace(timeText, ";", ",")
+        
+        ' 分割多个时间段
+        timeRanges = Split(timeText, ",")
+        
+        For Each timeRange In timeRanges
+            timeRange = Trim(timeRange)
+            If timeRange = "" Then GoTo NextTimeRange
+            
+            ' 替换所有连接符为标准连接符"-"
+            timeRange = Replace(timeRange, "—", "-")
+            timeRange = Replace(timeRange, "－", "-")
+            timeRange = Replace(timeRange, "–", "-")
+            timeRange = Replace(timeRange, "─", "-")
+            timeRange = Replace(timeRange, "━", "-")
+            timeRange = Replace(timeRange, "~", "-")
+            timeRange = Replace(timeRange, "至", "-")
+            
+            timeParts = Split(timeRange, "-")
+            
+            ' 检查每个时间点
+            For Each timePart In timeParts
+                timePart = Replace(timePart, "次日", "")
+                timePart = Trim(timePart)
+                
+                ' 统一冒号格式（将中文冒号转换为英文冒号）
+                timePart = Replace(timePart, "：", ":")
+                
+                hourMin = Split(timePart, ":")
+                
+                If UBound(hourMin) = 1 Then
+                    If Not (IsNumeric(hourMin(0)) And IsNumeric(hourMin(1))) Then
+                        CheckTimeFormat = False
+                        Exit Function
+                    End If
+                    
+                    ' 检查时间范围
+                    hour = CLng(hourMin(0))
+                    minute = CLng(hourMin(1))
+                    
+                    If hour < 0 Or hour > 24 Or minute < 0 Or minute > 59 Then
+                        CheckTimeFormat = False
+                        Exit Function
+                    End If
+                    
+                    ' 特殊处理24:00的情况
+                    If hour = 24 And minute > 0 Then
+                        CheckTimeFormat = False
+                        Exit Function
+                    End If
+                Else
+                    CheckTimeFormat = False
+                    Exit Function
+                End If
+            Next timePart
+NextTimeRange:
+        Next timeRange
+        
+        CheckTimeFormat = True
+    Else
+        ' 如果不包含冒号，则认为这行不是时间行
+        CheckTimeFormat = True
+    End If
+End Function
+

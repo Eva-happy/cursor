@@ -1,0 +1,167 @@
+Option Explicit
+
+' 倒推计算参数值
+Function ReverseCalculateParameter(ByVal paramType As String, ByVal targetIRR As Double, ByVal irrType As String) As Double
+    Dim baseSheet As Worksheet
+    Dim calcSheet As Worksheet
+    Dim baseValue As Double
+    Dim leftValue As Double
+    Dim rightValue As Double
+    Dim midValue As Double
+    Dim currentIRR As Double
+    Dim iterations As Long
+    Dim maxIterations As Long
+    Const TOLERANCE As Double = 0.0001 ' IRR的容差
+    
+    ' 初始化工作表
+    Set baseSheet = ThisWorkbook.Sheets("基础参数及输出结果表")
+    Set calcSheet = ThisWorkbook.Sheets("光伏收益测算表")
+    
+    ' 获取参数的基准值
+    Select Case paramType
+        Case "发电小时数", "发电小时数（单位：小时）"
+            baseValue = baseSheet.Range("B23").Value
+        Case "电价", "电价（单位：元/kWh）"
+            baseValue = baseSheet.Range("B42").Value
+        Case "消纳率", "消纳率（比率）"
+            baseValue = baseSheet.Range("B37").Value
+        Case "初始总投资", "初始总投资（单位：元/kWh）"
+            baseValue = baseSheet.Range("F7").Value
+        Case "消交流侧装机容量", "消交流侧装机容量（备案容量）"
+            baseValue = baseSheet.Range("B12").Value
+        Case "技改费", "技改费（万元）"
+            baseValue = baseSheet.Range("F25").Value
+        Case "股权资本金占比"
+            baseValue = baseSheet.Range("J23").Value
+        Case "还款年限", "还款年限（年）"
+            baseValue = baseSheet.Range("J26").Value
+        Case "利率"
+            baseValue = baseSheet.Range("J27").Value
+        Case "脱硫燃煤标杆电价", "脱硫燃煤标杆电价（单位：元/kWh）"
+            baseValue = baseSheet.Range("B39").Value
+        Case "光伏电站标杆上网电价", "光伏电站标杆上网电价（单位：元/kWh）"
+            baseValue = baseSheet.Range("B41").Value
+            
+        Case Else
+            MsgBox "不支持的参数类型：" & paramType, vbExclamation
+            Exit Function
+    End Select
+    
+    ' 设置搜索范围
+    leftValue = baseValue * 0.5  ' 基准值的50%
+    rightValue = baseValue * 1.5 ' 基准值的150%
+    maxIterations = 50 ' 最大迭代次数
+    
+    ' 二分法搜索
+    Do While iterations < maxIterations
+        midValue = (leftValue + rightValue) / 2
+        currentIRR = CalculateNewValue(paramType, midValue, irrType)
+        
+        ' 检查是否找到足够接近的值
+        If Abs(currentIRR - targetIRR) < TOLERANCE Then
+            ReverseCalculateParameter = midValue
+            Exit Function
+        End If
+        
+        ' 调整搜索范围
+        If currentIRR < targetIRR Then
+            Select Case paramType
+                Case "初始总投资", "技改费"
+                    rightValue = midValue ' 这些参数与IRR负相关
+                Case Else
+                    leftValue = midValue ' 其他参数与IRR正相关
+            End Select
+        Else
+            Select Case paramType
+                Case "初始总投资", "技改费"
+                    leftValue = midValue
+                Case Else
+                    rightValue = midValue
+            End Select
+        End If
+        
+        iterations = iterations + 1
+    Loop
+    
+    ' 如果达到最大迭代次数仍未找到解
+    MsgBox "警告：未能在" & maxIterations & "次迭代内找到精确解。返回最接近的值。", vbInformation
+    ReverseCalculateParameter = midValue
+End Function
+
+' 创建倒推计算界面
+Sub ShowReverseCalculationForm()
+    Dim paramType As String
+    Dim targetIRR As Double
+    Dim irrType As String
+    Dim result As Double
+    
+    ' 参数选择
+    paramType = InputBox("请输入要倒推的参数类型：" & vbNewLine & _
+                        "1. 发电小时数" & vbNewLine & _
+                        "2. 电价" & vbNewLine & _
+                        "3. 消纳率" & vbNewLine & _
+                        "4. 初始总投资" & vbNewLine & _
+                        "5. 消交流侧装机容量" & vbNewLine & _
+                        "6. 技改费" & vbNewLine & _
+                        "7. 股权资本金占比" & vbNewLine & _
+                        "8. 还款年限" & vbNewLine & _
+                        "9. 利率" & vbNewLine & _
+                        "10.脱硫燃煤标杆电价" & vbNewLine & _
+                        "11.光伏电站标杆上网电价" & vbNewLine & _
+                        "请输入数字(1-11)：")
+    
+    ' 转换参数类型
+    Select Case paramType
+        Case "1": paramType = "发电小时数"
+        Case "2": paramType = "电价"
+        Case "3": paramType = "消纳率"
+        Case "4": paramType = "初始总投资"
+        Case "5": paramType = "消交流侧装机容量"
+        Case "6": paramType = "技改费"
+        Case "7": paramType = "股权资本金占比"
+        Case "8": paramType = "还款年限"
+        Case "9": paramType = "利率"
+        Case "10": paramType = "脱硫燃煤标杆电价"
+        Case "11": paramType = "光伏电站标杆上网电价"
+        Case Else
+            MsgBox "无效的选择！", vbExclamation
+            Exit Sub
+    End Select
+    
+    ' IRR类型选择
+    Dim irrChoice As String
+    irrChoice = InputBox("请选择IRR类型：" & vbNewLine & _
+                        "1. 全投资IRR" & vbNewLine & _
+                        "2. 资本金IRR" & vbNewLine & _
+                        "请输入数字(1-2)：")
+    
+    Select Case irrChoice
+        Case "1": irrType = "全投资IRR"
+        Case "2": irrType = "资本金IRR"
+        Case Else
+            MsgBox "无效的选择！", vbExclamation
+            Exit Sub
+    End Select
+    
+    ' 目标IRR输入
+    Dim targetIRRStr As String
+    targetIRRStr = InputBox("请输入目标" & irrType & "值（例如：0.08 表示8%）：")
+    
+    If Not IsNumeric(targetIRRStr) Then
+        MsgBox "请输入有效的数字！", vbExclamation
+        Exit Sub
+    End If
+    
+    targetIRR = CDbl(targetIRRStr)
+    
+    ' 计算结果
+    result = ReverseCalculateParameter(paramType, targetIRR, irrType)
+    
+    ' 显示结果
+    MsgBox "计算结果：" & vbNewLine & _
+           "参数类型：" & paramType & vbNewLine & _
+           "目标" & irrType & "：" & Format(targetIRR, "0.00%") & vbNewLine & _
+           "计算得到的参数值：" & Format(result, "0.00"), vbInformation
+End Sub
+
+

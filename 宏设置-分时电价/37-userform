@@ -1,0 +1,99 @@
+
+
+Private Sub UserForm_Initialize()
+    Dim ws As Worksheet
+    Dim lastRow As Long
+    Dim i As Long
+    Dim regions As Collection
+    Set regions = New Collection
+    
+    ' 获取解析结果工作表
+    On Error Resume Next
+    Set ws = ThisWorkbook.Worksheets("解析结果")
+    If ws Is Nothing Then
+        MsgBox "未找到'解析结果'工作表！", vbExclamation
+        Me.Hide
+        Exit Sub
+    End If
+    On Error GoTo 0
+    
+    ' 获取最后一行
+    lastRow = ws.Cells(ws.Rows.Count, "A").End(xlUp).Row
+    
+    ' 收集所有不同的地区
+    On Error Resume Next
+    For i = 2 To lastRow
+        Dim currentRegion As String
+        currentRegion = Trim(ws.Cells(i, 1).value)
+        If currentRegion <> "" Then
+            regions.Add currentRegion, currentRegion
+        End If
+    Next i
+    On Error GoTo 0
+    
+    ' 将地区添加到列表框
+    Dim region As Variant
+    For Each region In regions
+        RegionList.AddItem CStr(region)
+    Next region
+    
+    ' 如果有地区，选择第一个
+    If RegionList.ListCount > 0 Then
+        RegionList.ListIndex = 0
+    End If
+End Sub
+
+Private Sub OKButton_Click()
+    ' 如果没有选择地区，显示提示并退出
+    If RegionList.ListIndex = -1 Then
+        MsgBox "请选择一个地区！", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 获取选中的地区
+    Dim selectedRegion As String
+    selectedRegion = RegionList.value
+    
+    ' 获取必要的工作表
+    Dim wsSingle As Worksheet
+    Dim wsSource As Worksheet
+    Set wsSingle = ThisWorkbook.Worksheets("单个地区时段表")
+    Set wsSource = ThisWorkbook.Worksheets("解析结果")
+    
+    ' 获取解析结果的最后一行
+    Dim lastRow As Long
+    lastRow = wsSource.Cells(wsSource.Rows.Count, "A").End(xlUp).Row
+    
+    ' 调用UpdateSingleRegionData
+    Call UpdateSingleRegionData(wsSingle, wsSource, selectedRegion, lastRow)
+    
+    ' 关闭窗体
+    Unload Me
+End Sub
+
+Private Sub CancelButton_Click()
+    ' 点击取消按钮时关闭窗体
+    Unload Me
+End Sub
+Private Sub ApplyFilter()
+    ' 如果没有选择地区，显示提示并退出
+    If RegionList.ListIndex = -1 Then
+        MsgBox "请选择一个地区！", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 获取选中的地区
+    Dim selectedRegion As String
+    selectedRegion = RegionList.value
+    
+    ' 更新单个地区时段表
+    Call UpdateSelectedRegion(selectedRegion)
+    
+    ' 关闭窗体
+    Unload Me
+ End Sub
+
+Private Sub RegionList_DblClick(ByVal Cancel As MSForms.ReturnBoolean)
+    ' 双击列表项时执行确认操作
+    Call OKButton_Click
+End Sub

@@ -1,0 +1,623 @@
+from selenium import webdriver
+from selenium.webdriver.edge.service import Service
+from selenium.webdriver.edge.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
+import time
+import os
+import pandas as pd
+import json
+from datetime import datetime
+from bs4 import BeautifulSoup
+
+def wait_and_click(driver, by, value, timeout=20):
+    """等待元素可点击并点击"""
+    try:
+        element = WebDriverWait(driver, timeout).until(
+            EC.element_to_be_clickable((by, value))
+        )
+        driver.execute_script("arguments[0].scrollIntoView(true);", element)
+        time.sleep(1)
+        element.click()
+        return True
+    except Exception as e:
+        print(f"点击元素失败: {value}, 错误: {e}")
+        return False
+
+def navigate_to_price_page(driver):
+    """导航到电价标准页面"""
+    try:
+        time.sleep(5)
+        
+        # 点击信息公开
+        info_selectors = [
+            (By.XPATH, "//span[contains(text(), '信息公开')]"),
+            (By.XPATH, "//a[contains(text(), '信息公开')]"),
+            (By.LINK_TEXT, "信息公开")
+        ]
+        
+        clicked = False
+        for by, selector in info_selectors:
+            try:
+                element = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((by, selector))
+                )
+                element.click()
+                clicked = True
+                print("成功点击信息公开")
+                break
+            except Exception as e:
+                print(f"点击信息公开失败，尝试下一个选择器: {e}")
+                continue
+        
+        if not clicked:
+            print("点击信息公开失败")
+            return False
+            
+        time.sleep(2)
+        
+        # 点击电价标准
+        price_selectors = [
+            (By.XPATH, "//span[@data-v-3155b39b and contains(text(), '电价标准')]"),
+            (By.XPATH, "//span[contains(@style, 'cursor: pointer') and contains(text(), '电价标准')]"),
+            (By.XPATH, "//span[text()='电价标准']"),
+            (By.LINK_TEXT, "电价标准")
+        ]
+        
+        clicked = False
+        for by, selector in price_selectors:
+            try:
+                print(f"尝试选择器: {selector}")
+                element = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((by, selector))
+                )
+                print("找到电价标准元素")
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+                time.sleep(0.5)
+                try:
+                    element.click()
+                except:
+                    driver.execute_script("arguments[0].click();", element)
+                clicked = True
+                print("成功点击电价标准")
+                break
+            except Exception as e:
+                print(f"点击电价标准失败，尝试下一个选择器: {e}")
+                continue
+        
+        if not clicked:
+            print("点击电价标准失败")
+            return False
+            
+        time.sleep(2)
+        
+        # 点击代理购电
+        agency_selectors = [
+            # 使用表格单元格选择器
+            (By.CSS_SELECTOR, "div.cell"),
+            (By.XPATH, "//div[contains(@class, 'cell') and contains(text(), '代理购电')]"),
+            (By.XPATH, "//tr[contains(@class, 'el-table_row')]//div[contains(@class, 'cell') and contains(text(), '代理购电')]"),
+            # 使用完整的路径选择器
+            (By.CSS_SELECTOR, ".el-table_row .el-table_1_column_1 .cell"),
+            (By.XPATH, "//td[contains(@class, 'el-table_1_column_1')]//div[contains(@class, 'cell')]"),
+            # 使用文本内容选择器
+            (By.XPATH, "//div[contains(text(), '代理购电')]")
+        ]
+        
+        clicked = False
+        for by, selector in agency_selectors:
+            try:
+                print(f"尝试选择器: {selector}")
+                # 等待元素可见和可点击
+                element = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((by, selector))
+                )
+                print("找到代理购电元素")
+                # 确保元素在视图中
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+                time.sleep(0.5)
+                
+                try:
+                    # 先检查元素是否可见和可交互
+                    if element.is_displayed() and element.is_enabled():
+                        element.click()
+                    else:
+                        # 如果元素状态不对，使用JavaScript点击
+                        driver.execute_script("arguments[0].click();", element)
+                except:
+                    # 如果常规点击失败，尝试JavaScript点击
+                    driver.execute_script("arguments[0].click();", element)
+                
+                clicked = True
+                print("成功点击代理购电")
+                break
+            except Exception as e:
+                print(f"点击代理购电失败，尝试下一个选择器: {e}")
+                continue
+        
+        if not clicked:
+            print("点击代理购电失败")
+            return False
+            
+        time.sleep(2)
+        
+        return True
+    except Exception as e:
+        print(f"导航到电价页面时出错: {e}")
+        return False
+
+def get_region_options(driver, level="province"):
+    """获取地区选项"""
+    try:
+        # 如果是省份级别，需要先点击地区选择器
+        if level == "province":
+            # 等待页面完全加载
+            time.sleep(5)
+            
+            # 先点击地区选择器
+            region_selectors = [
+                (By.CSS_SELECTOR, "div.city_select a.current"),
+                (By.XPATH, "//div[contains(@class, 'city_select')]//a[contains(@class, 'current')]"),
+                (By.XPATH, "//div[contains(@class, 'region')]//a[contains(@class, 'current')]")
+            ]
+            
+            clicked = False
+            for by, selector in region_selectors:
+                try:
+                    print(f"尝试点击地区选择器: {selector}")
+                    element = WebDriverWait(driver, 10).until(
+                        EC.element_to_be_clickable((by, selector))
+                    )
+                    element.click()
+                    clicked = True
+                    print("成功点击地区选择器")
+                    break
+                except Exception as e:
+                    print(f"点击地区选择器失败: {str(e)}")
+                    continue
+            
+            if not clicked:
+                print("无法点击地区选择器")
+                return []
+            
+            # 等待省份列表加载
+            time.sleep(2)
+            
+            try:
+                # 获取包含省份列表的元素
+                province_container = WebDriverWait(driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, "div.province.bkwhite"))
+                )
+                
+                # 获取HTML内容
+                html_content = province_container.get_attribute('outerHTML')
+                
+                # 使用BeautifulSoup解析HTML
+                soup = BeautifulSoup(html_content, 'html.parser')
+                
+                # 获取所有省份链接
+                province_links = soup.find_all('a', class_='f66 fsize14')
+                
+                if not province_links:
+                    print("未找到省份链接")
+                    return []
+                
+                # 获取省份文本和对应的元素
+                provinces = []
+                for i, link in enumerate(province_links, 1):
+                    province_text = link.text.strip()
+                    if province_text:
+                        # 在driver中找到对应的元素
+                        province_element = driver.find_element(By.XPATH, 
+                            f"//a[contains(@class, 'f66 fsize14') and normalize-space()='{province_text}']")
+                        provinces.append((i, province_text, province_element))
+                
+                if not provinces:
+                    print("未找到有效的省份")
+                    return []
+                
+                # 打印找到的选项
+                print("\n可选择的省份:")
+                valid_options = [(i, text) for i, text, _ in provinces]
+                for i, text in valid_options:
+                    print(f"{i}. {text}")
+                
+                return valid_options
+                
+            except Exception as e:
+                print(f"解析省份列表失败: {str(e)}")
+                return []
+            
+        else:
+            # 获取下一级选项（城市或区县）
+            return get_next_level_options(driver)
+        
+    except Exception as e:
+        print(f"获取地区选项时出错: {str(e)}")
+        print("错误详情:", e.__class__.__name__)
+        import traceback
+        print(traceback.format_exc())
+        return []
+
+def select_region(driver, text):
+    """选择地区"""
+    try:
+        selectors = [
+            # 优先使用最精确的选择器
+            f"//ul[contains(@class, 'tab-con-box-ul')]//li[contains(@class, 'tab-con-box-li') and normalize-space()='{text}']",
+            f"//div[@data-v-40fe627e]//ul[contains(@class, 'tab-con-box-ul')]//li[normalize-space()='{text}']",
+            f"//div[contains(@class, 'el-scrollbar__view')]//li[contains(@class, 'tab-con-box-li') and normalize-space()='{text}']",
+            f"//div[contains(@class, 'tab-content')]//li[normalize-space()='{text}']"
+        ]
+        
+        for selector in selectors:
+            try:
+                print(f"尝试选择器: {selector}")
+                # 等待元素可见和可点击
+                element = WebDriverWait(driver, 10).until(
+                    EC.element_to_be_clickable((By.XPATH, selector))
+                )
+                print(f"找到元素: {element.text}")
+                
+                # 确保元素在视图中
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+                time.sleep(0.5)
+                
+                # 尝试点击
+                try:
+                    # 先检查元素是否仍然可见和可交互
+                    if element.is_displayed() and element.is_enabled():
+                        element.click()
+                    else:
+                        # 如果元素状态改变，使用JavaScript点击
+                        driver.execute_script("arguments[0].click();", element)
+                except:
+                    # 如果直接点击失败，使用JavaScript点击
+                    driver.execute_script("arguments[0].click();", element)
+                
+                print(f"成功选择地区: {text}")
+                return True
+            except Exception as e:
+                print(f"选择器 {selector} 失败: {str(e)}")
+                continue
+                
+        print(f"警告: 未能选择地区 {text}")
+        return False
+    except Exception as e:
+        print(f"选择地区时出错: {e}")
+        return False
+
+def extract_price_data(driver):
+    """提取电价数据"""
+    try:
+        # 等待表格加载
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CLASS_NAME, "el-table"))
+        )
+        time.sleep(2)
+        
+        # 获取表格数据
+        table = driver.find_element(By.CLASS_NAME, "el-table")
+        rows = table.find_elements(By.TAG_NAME, "tr")
+        
+        data = []
+        for row in rows[1:]:  # 跳过表头
+            cols = row.find_elements(By.TAG_NAME, "td")
+            if cols:
+                row_data = {
+                    "用电类型": cols[0].text if len(cols) > 0 else "",
+                    "电压等级": cols[1].text if len(cols) > 1 else "",
+                    "电度电价": cols[2].text if len(cols) > 2 else "",
+                    "尖峰时段": cols[3].text if len(cols) > 3 else "",
+                    "高峰时段": cols[4].text if len(cols) > 4 else "",
+                    "平时段": cols[5].text if len(cols) > 5 else "",
+                    "低谷时段": cols[6].text if len(cols) > 6 else "",
+                    "容量电价": cols[7].text if len(cols) > 7 else ""
+                }
+                data.append(row_data)
+        
+        return pd.DataFrame(data)
+    except Exception as e:
+        print(f"提取数据时出错: {e}")
+        return None
+
+def is_direct_municipality(province):
+    """判断是否为直辖市"""
+    direct_municipalities = ["北京", "上海", "天津", "重庆"]
+    return any(municipality in province for municipality in direct_municipalities)
+
+def get_next_level_options(driver):
+    """获取下一级地区选项"""
+    try:
+        # 等待选项列表容器出现
+        WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "div[data-v-40fe627e].region"))
+        )
+        time.sleep(1)  # 短暂等待确保动画完成
+        
+        # 获取选项列表
+        menu_selectors = [
+            # 优先使用最精确的选择器
+            (By.CSS_SELECTOR, "div[data-v-40fe627e] .tab-con-box-ul .tab-con-box-li"),
+            (By.XPATH, "//div[@data-v-40fe627e]//ul[contains(@class, 'tab-con-box-ul')]//li"),
+            (By.CSS_SELECTOR, ".el-scrollbar__view .tab-con-box-ul .tab-con-box-li"),
+            (By.XPATH, "//div[contains(@class, 'el-scrollbar__view')]//li[contains(@class, 'tab-con-box-li')]")
+        ]
+        
+        options = []
+        for by, selector in menu_selectors:
+            try:
+                print(f"尝试获取选项列表: {selector}")
+                # 等待至少一个选项可见
+                WebDriverWait(driver, 5).until(
+                    EC.visibility_of_element_located((by, selector))
+                )
+                # 获取所有选项
+                elements = driver.find_elements(by, selector)
+                if elements:
+                    print(f"找到 {len(elements)} 个选项")
+                    # 验证选项是否有效
+                    valid_elements = [elem for elem in elements if elem.is_displayed() and elem.text.strip()]
+                    if valid_elements:
+                        print(f"有效选项数量: {len(valid_elements)}")
+                        options = valid_elements
+                        break
+                    else:
+                        print("未找到有效选项，尝试下一个选择器")
+                        continue
+            except Exception as e:
+                print(f"选择器 {selector} 失败: {str(e)}")
+                continue
+        
+        if not options:
+            print("警告: 未找到任何选项")
+            return []
+        
+        # 过滤并返回有效选项
+        valid_options = [(i, option.text.strip()) for i, option in enumerate(options, 1)]
+        
+        # 打印找到的选项
+        if valid_options:
+            print("\n找到的选项:")
+            for i, text in valid_options:
+                print(f"{i}. {text}")
+            return valid_options
+        return []
+        
+    except Exception as e:
+        print(f"获取地区选项时出错: {str(e)}")
+        print("错误详情:", e.__class__.__name__)
+        import traceback
+        print(traceback.format_exc())
+        return []
+
+def interactive_region_selection():
+    """交互式地区选择"""
+    # 获取脚本所在目录的完整路径
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(script_dir)
+    
+    # 检查驱动程序
+    driver_path = os.path.join(script_dir, "msedgedriver.exe")
+    if not os.path.exists(driver_path):
+        print(f"错误: msedgedriver.exe 不存在于 {driver_path}")
+        return
+    
+    # 设置 Edge 选项
+    edge_options = Options()
+    edge_options.add_argument("--start-maximized")
+    edge_options.add_argument("--inprivate")
+    edge_options.add_argument("--disable-gpu")
+    edge_options.add_argument("--no-sandbox")
+    edge_options.add_argument("--disable-dev-shm-usage")
+    
+    try:
+        # 初始化浏览器
+        service = Service(driver_path)
+        driver = webdriver.Edge(service=service, options=edge_options)
+        
+        # 访问网站
+        print("正在访问网站...")
+        driver.get("https://www.95598.cn/osgweb/index")  # 修改为主页URL
+        print("等待页面加载...")
+        time.sleep(10)
+        
+        # 获取省份列表
+        print("\n=== 请选择省份/直辖市 ===")
+        print("正在获取省份列表...")
+        provinces = get_region_options(driver, "province")
+        
+        if not provinces:
+            print("未获取到省份列表，正在重试...")
+        time.sleep(5)
+            provinces = get_region_options(driver, "province")
+            
+        if not provinces:
+            print("重试后仍未获取到省份列表")
+            return
+        
+        # 显示省份选项
+        print("\n可选择的省份/直辖市:")
+        for i, province in provinces:
+            print(f"{i}. {province}")
+        
+        # 用户选择省份
+        while True:
+            try:
+                choice = int(input("\n请输入省份/直辖市编号: "))
+                if 1 <= choice <= len(provinces):
+                    selected_province = provinces[choice-1][1]
+                    break
+                else:
+                    print("无效的选择，请重试")
+            except ValueError:
+                print("请输入有效的数字")
+        
+        # 选择省份
+        if not select_region(driver, selected_province):
+            print("选择省份失败")
+            return
+        
+        time.sleep(3)
+        
+        # 判断是否为直辖市
+        is_municipality = is_direct_municipality(selected_province)
+        
+        if is_municipality:
+            # 直辖市处理：选择市辖区
+            print("\n=== 请选择市辖区 ===")
+            districts = get_next_level_options(driver)
+            if not districts:
+                print("未获取到市辖区列表")
+                return
+            
+            # 显示市辖区选项
+            for i, district in districts:
+                print(f"{i}. {district}")
+            
+            # 用户选择市辖区
+            while True:
+                try:
+                    choice = int(input("\n请输入市辖区编号: "))
+                    if 1 <= choice <= len(districts):
+                        selected_district = districts[choice-1][1]
+                        break
+                    else:
+                        print("无效的选择，请重试")
+                except ValueError:
+                    print("请输入有效的数字")
+            
+            # 选择市辖区
+            if not select_region(driver, selected_district):
+                print("选择市辖区失败")
+                return
+            
+            time.sleep(3)
+            
+            # 获取区列表
+            print("\n=== 请选择区 ===")
+            areas = get_next_level_options(driver)
+            if not areas:
+                print("未获取到区列表")
+                return
+            
+            # 显示区选项
+            for i, area in areas:
+                print(f"{i}. {area}")
+            
+            # 用户选择区
+            while True:
+                try:
+                    choice = int(input("\n请输入区编号: "))
+                    if 1 <= choice <= len(areas):
+                        selected_area = areas[choice-1][1]
+                        break
+                    else:
+                        print("无效的选择，请重试")
+                except ValueError:
+                    print("请输入有效的数字")
+            
+            # 选择区
+            if not select_region(driver, selected_area):
+                print("选择区失败")
+                return
+            
+            selected_city = selected_district
+            selected_district = selected_area
+            
+        else:
+            # 非直辖市处理：选择市
+            print("\n=== 请选择城市 ===")
+            cities = get_next_level_options(driver)
+            if not cities:
+                print("未获取到城市列表")
+                return
+            
+            # 显示城市选项
+            for i, city in cities:
+                print(f"{i}. {city}")
+            
+            # 用户选择城市
+            while True:
+                try:
+                    choice = int(input("\n请输入城市编号: "))
+                    if 1 <= choice <= len(cities):
+                        selected_city = cities[choice-1][1]
+                        break
+                    else:
+                        print("无效的选择，请重试")
+                except ValueError:
+                    print("请输入有效的数字")
+            
+            # 选择城市
+            if not select_region(driver, selected_city):
+                print("选择城市失败")
+                return
+            
+            time.sleep(3)
+            
+            # 获取区县列表
+            print("\n=== 请选择区/县 ===")
+            districts = get_next_level_options(driver)
+            if districts:  # 有些城市可能没有区县
+                # 显示区县选项
+                for i, district in districts:
+                    print(f"{i}. {district}")
+                
+                # 用户选择区县
+                while True:
+                    try:
+                        choice = int(input("\n请输入区/县编号: "))
+                        if 1 <= choice <= len(districts):
+                            selected_district = districts[choice-1][1]
+                            break
+                        else:
+                            print("无效的选择，请重试")
+                    except ValueError:
+                        print("请输入有效的数字")
+                
+                # 选择区县
+                if not select_region(driver, selected_district):
+                    print("选择区县失败")
+                    return
+        
+        time.sleep(3)
+        
+        # 导航到电价标准页面
+        if not navigate_to_price_page(driver):
+            print("导航到电价标准页面失败")
+            return
+        
+        # 提取数据
+        price_data = extract_price_data(driver)
+        if price_data is not None:
+            # 添加地区信息
+            price_data["省份"] = selected_province
+            price_data["城市"] = selected_city
+            if 'selected_district' in locals():
+                price_data["区县"] = selected_district
+            
+            # 保存数据
+            output_file = os.path.join(script_dir, f"电价数据_{selected_province}_{selected_city}.xlsx")
+            price_data.to_excel(output_file, index=False)
+            print(f"\n数据已保存到: {output_file}")
+        
+        input("\n按回车键关闭浏览器...")
+        
+    except Exception as e:
+        print(f"发生错误: {str(e)}")
+        print("错误详情:", e.__class__.__name__)
+        import traceback
+        print(traceback.format_exc())
+    finally:
+        try:
+            driver.quit()
+        except:
+            pass
+
+if __name__ == "__main__":
+    print("=== 开始运行自动化程序 ===")
+    print(f"系统时间: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+    interactive_region_selection()

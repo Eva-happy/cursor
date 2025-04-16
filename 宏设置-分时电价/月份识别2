@@ -1,0 +1,131 @@
+Private Sub ProcessTextLine(ByVal line As String, ByRef currentSeason As String, ByRef currentMonths As String, _
+                          ByRef specificMonths As String, ByRef timeType As String, _
+                          ByVal ws As Worksheet, ByRef debugRow As Long, ByRef currentRow As Long, _
+                          ByVal processedEntries As Collection, ByVal currentRegion As String)
+    ' 变量声明
+    Dim monthPart As String
+    Dim fullMonthList As String
+    Dim monthRange() As String
+    Dim startMonth As Long, endMonth As Long
+    Dim m As Long
+    Dim monthList() As String
+    Dim month As Variant
+    Dim monthGroups() As String
+    Dim monthGroup As Variant
+    Dim regEx As Object
+    Dim matches As Object
+    
+    ' 记录调试信息
+    ws.Cells(debugRow, 7).value = "正在处理地区 " & currentRegion & " 的行: " & line
+    debugRow = debugRow + 1
+    
+    ' 检查括号格式的月份
+    Set regEx = CreateObject("VBScript.RegExp")
+    regEx.Global = True
+    
+    ' 匹配格式：(3-6月) 或 （3-6月）或 (10、11月) 或 （10、11月）或 (10月) 或 （10月）
+    regEx.Pattern = "[(（]([0-9]+(?:-[0-9]+)?(?:、[0-9]+)*)[月][)）]"
+    
+    Set matches = regEx.Execute(line)
+    
+    If matches.Count > 0 Then
+        monthPart = matches(0).SubMatches(0)  ' 获取第一个捕获组
+        monthPart = Replace(monthPart, "，", "、")
+        monthPart = Replace(monthPart, ",", "、")
+        
+        ' 构建完整的月份列表
+        fullMonthList = ""
+        
+        ' 处理月份范围或列表
+        If InStr(monthPart, "-") > 0 Then
+            ' 处理范围格式 (3-6月)
+            monthRange = Split(monthPart, "-")
+            
+            On Error Resume Next
+            startMonth = CLng(Trim(monthRange(0)))
+            endMonth = CLng(Trim(monthRange(1)))
+            
+            If Err.Number = 0 Then
+                For m = startMonth To endMonth
+                    If fullMonthList <> "" Then fullMonthList = fullMonthList & "、"
+                    fullMonthList = fullMonthList & CStr(m)
+                Next m
+            End If
+            On Error GoTo 0
+        ElseIf InStr(monthPart, "、") > 0 Then
+            ' 处理列表格式 (10、11月)
+            monthList = Split(monthPart, "、")
+            For Each month In monthList
+                If fullMonthList <> "" Then fullMonthList = fullMonthList & "、"
+                fullMonthList = fullMonthList & Trim(month)
+            Next month
+        Else
+            ' 处理单个月份 (10月)
+            fullMonthList = Trim(monthPart)
+        End If
+        
+        ' 更新当前月份
+        If fullMonthList <> "" Then
+            currentMonths = fullMonthList
+            specificMonths = fullMonthList
+            
+            ' 记录调试信息
+            ws.Cells(debugRow, 7).value = "地区: " & currentRegion & ", 提取到月份: " & fullMonthList
+            debugRow = debugRow + 1
+        End If
+    End If
+    
+    ' 检查是否包含月份信息（非季节行）
+    If InStr(line, "月份") > 0 Then
+        ' 提取月份信息
+        monthPart = Trim(Mid(line, InStr(line, "月份") + 2))
+        monthPart = Replace(monthPart, "：", ":")  ' 统一冒号格式
+        monthPart = Mid(monthPart, InStr(monthPart, ":") + 1)  ' 获取冒号后的内容
+        monthPart = Replace(monthPart, "月", "")  ' 移除"月"字
+        monthPart = Replace(monthPart, "。", "")
+        monthPart = Replace(monthPart, "，", "、")
+        monthPart = Replace(monthPart, ",", "、")
+        monthPart = Trim(monthPart)
+        
+        ' 分割多个月份组
+        monthGroups = Split(monthPart, "、")
+        
+        ' 构建完整的月份列表
+        fullMonthList = ""
+        
+        ' 处理每个月份组
+        For Each monthGroup In monthGroups
+            If InStr(CStr(monthGroup), "-") > 0 Then
+                ' 处理月份范围
+                monthRange = Split(CStr(monthGroup), "-")
+            
+                ' 确保转换成功
+                On Error Resume Next
+                startMonth = CLng(Trim(monthRange(0)))
+                endMonth = CLng(Trim(monthRange(1)))
+                
+                If Err.Number = 0 Then
+                    ' 添加范围内的所有月份
+                    For m = startMonth To endMonth
+                        If fullMonthList <> "" Then fullMonthList = fullMonthList & "、"
+                        fullMonthList = fullMonthList & CStr(m)
+                    Next m
+                End If
+                On Error GoTo 0
+            Else
+                ' 处理单个月份
+                If fullMonthList <> "" Then fullMonthList = fullMonthList & "、"
+                fullMonthList = fullMonthList & Trim(monthGroup)
+            End If
+        Next monthGroup
+        
+        ' 更新当前月份
+        If fullMonthList <> "" Then
+            currentMonths = fullMonthList
+            specificMonths = fullMonthList
+            
+            ' 记录调试信息
+            ws.Cells(debugRow, 7).value = "地区: " & currentRegion & ", 提取到月份: " & fullMonthList
+            debugRow = debugRow + 1
+        End If
+    End If

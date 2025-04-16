@@ -1,0 +1,1356 @@
+Option Explicit
+' 新增函数：清除所有工作表的删除线格式
+Sub ClearAllStrikethrough()
+    Dim ws As Worksheet
+    
+    ' 关闭屏幕更新以提高性能
+    Application.screenUpdating = False
+    
+    ' 遍历所有工作表
+    For Each ws In ThisWorkbook.Worksheets
+        ' 清除当前工作表所有单元格的删除线格式
+        Debug.Print "正在清除工作表 """ & ws.Name & """ 的删除线格式..."
+        ws.Cells.Font.Strikethrough = False
+    Next ws
+    
+    ' 特别确保关键工作表的删除线被清除
+    With ThisWorkbook.Sheets("基础参数及输出结果表")
+        .Cells.Font.Strikethrough = False
+        
+        ' 特别关注的单元格
+        .Range("B23").Font.Strikethrough = False  ' 发电小时数
+        .Range("B42").Font.Strikethrough = False  ' 电价
+        .Range("B37").Font.Strikethrough = False  ' 消纳率
+        .Range("N8:N11").Font.Strikethrough = False  ' IRR和回收期
+    End With
+    
+    With ThisWorkbook.Sheets("光伏收益测算表")
+        .Cells.Font.Strikethrough = False
+    End With
+    
+    ' 恢复屏幕更新
+    Application.screenUpdating = True
+    
+    MsgBox "已清除所有工作表的删除线格式！", vbInformation
+End Sub
+
+Function 计算新IRR(ByVal 参数类型 As String, ByVal 新参数值 As Double, ByVal IRR类型 As String) As Double
+    Static baseSheet As Worksheet
+    Static calcSheet As Worksheet
+    Dim baseValue As Double
+    Dim oldCalculation As XlCalculation
+    
+    On Error Resume Next
+    
+    ' 只在第一次调用时初始化工作表引用
+    If baseSheet Is Nothing Then
+    Set baseSheet = ThisWorkbook.Sheets("基础参数及输出结果表")
+    End If
+    If calcSheet Is Nothing Then
+    Set calcSheet = ThisWorkbook.Sheets("光伏收益测算表")
+    End If
+    
+    If baseSheet Is Nothing Then
+        MsgBox "未找到'基础参数及输出结果表'工作表！", vbExclamation
+        Exit Function
+    End If
+    
+    If calcSheet Is Nothing Then
+        MsgBox "未找到'光伏收益测算表'工作表！", vbExclamation
+        Exit Function
+    End If
+    
+    ' 保存当前计算模式
+    oldCalculation = Application.calculation
+    
+    ' 设置手动计算模式
+    Application.calculation = xlCalculationManual
+    
+    ' 获取原始值用于之后恢复
+    Select Case 参数类型
+        Case "发电小时数", "发电小时数（单位：小时）"
+            baseValue = baseSheet.Range("B23").Value
+            baseSheet.Range("B23").Value = 新参数值
+        Case "电价", "电价（单位：元/kWh）"
+            baseValue = baseSheet.Range("B42").Value
+            baseSheet.Range("B42").Value = 新参数值
+        Case "消纳率", "消纳率（比率）"
+            baseValue = baseSheet.Range("B37").Value
+            baseSheet.Range("B37").Value = 新参数值
+        Case "初始总投资", "初始总投资（万元）"
+            baseValue = baseSheet.Range("F7").Value
+            baseSheet.Range("F7").Value = 新参数值
+        Case "消交流侧装机容量", "消交流侧装机容量（备案容量）"
+            baseValue = baseSheet.Range("B12").Value
+            baseSheet.Range("B12").Value = 新参数值
+        Case "运维管理费", "运维管理费（元/W）"
+            baseValue = baseSheet.Range("F24").Value
+            baseSheet.Range("F24").Value = 新参数值
+        Case "技改费", "技改费（元/W）"
+            baseValue = baseSheet.Range("F25").Value
+            baseSheet.Range("F25").Value = 新参数值
+        Case "股权资本金占比", "股权资本金占比（比率）"
+            baseValue = baseSheet.Range("J23").Value
+            baseSheet.Range("J23").Value = 新参数值
+        Case "还款年限", "还款年限（年）"
+            baseValue = baseSheet.Range("J26").Value
+            baseSheet.Range("J26").Value = 新参数值
+        Case "利率", "利率（比率）"
+            baseValue = baseSheet.Range("J27").Value
+            baseSheet.Range("J27").Value = 新参数值
+        Case "脱硫燃煤标杆电价", "脱硫燃煤标杆电价（单位：元/kWh）"
+            baseValue = baseSheet.Range("B39").Value
+            baseSheet.Range("B39").Value = 新参数值
+        Case "光伏电站标杆上网电价", "光伏电站标杆上网电价（单位：元/kWh）"
+            baseValue = baseSheet.Range("B41").Value
+            baseSheet.Range("B41").Value = 新参数值
+        Case "集中式光伏-脱硫燃煤标杆电价", "集中式光伏-脱硫燃煤标杆电价（单位：元/kWh）"
+            baseValue = baseSheet.Range("B44").Value
+            baseSheet.Range("B44").Value = 新参数值
+        Case "集中式光伏-综合上网电价", "集中式光伏-综合上网电价（单位：元/kWh）"
+            baseValue = baseSheet.Range("B45").Value
+            baseSheet.Range("B45").Value = 新参数值
+    End Select
+    
+    ' 检查计算结果
+    If Err.Number <> 0 Then
+        计算新IRR = 0
+        Debug.Print "计算" & IRR类型 & "失败: " & Err.Description
+    End If
+    On Error GoTo 0
+    
+    ' 恢复原始值
+    Select Case 参数类型
+        Case "发电小时数", "发电小时数（单位：小时）"
+            baseSheet.Range("B23").Value = baseValue
+        Case "电价", "电价（单位：元/kWh）"
+            baseSheet.Range("B42").Value = baseValue
+        Case "消纳率", "消纳率（比率）"
+            baseSheet.Range("B37").Value = baseValue
+        Case "初始总投资", "初始总投资（万元）"
+            baseSheet.Range("F7").Value = baseValue
+        Case "消交流侧装机容量", "消交流侧装机容量（备案容量）"
+            baseSheet.Range("B12").Value = baseValue
+        Case "运维管理费", "运维管理费（元/W）"
+            baseSheet.Range("F24").Value = baseValue
+        Case "技改费", "技改费（元/W）"
+            baseSheet.Range("F25").Value = baseValue
+        Case "股权资本金占比", "股权资本金占比（比率）"
+            baseSheet.Range("J23").Value = baseValue
+        Case "还款年限", "还款年限（年）"
+            baseSheet.Range("J26").Value = baseValue
+        Case "利率", "利率（比率）"
+            baseSheet.Range("J27").Value = baseValue
+        Case "脱硫燃煤标杆电价", "脱硫燃煤标杆电价（单位：元/kWh）"
+            baseSheet.Range("B39").Value = baseValue
+        Case "光伏电站标杆上网电价", "光伏电站标杆上网电价（单位：元/kWh）"
+            baseSheet.Range("B41").Value = baseValue
+        Case "集中式光伏-脱硫燃煤标杆电价", "集中式光伏-脱硫燃煤标杆电价（单位：元/kWh）"
+            baseSheet.Range("B44").Value = baseValue
+        Case "集中式光伏-综合上网电价", "集中式光伏-综合上网电价（单位：元/kWh）"
+            baseSheet.Range("B45").Value = baseValue
+    End Select
+    
+    ' 再次计算以恢复原始状态
+    calcSheet.Calculate
+    baseSheet.Calculate
+    
+    ' 恢复原始计算模式
+    Application.calculation = oldCalculation
+End Function
+
+' 新增函数：计算总体敏感性分析结果
+Private Sub CalculateOverallSensitivity()
+    Dim ws As Worksheet
+    Dim baseSheet As Worksheet
+    Dim i As Long
+    Dim paramTypes As Variant
+    Dim gridMode As String
+    
+    Set ws = ThisWorkbook.Sheets("总体敏感性分析")
+    Set baseSheet = ThisWorkbook.Sheets("基础参数及输出结果表")
+    
+    ' 获取上网模式
+    gridMode = baseSheet.Range("B16").Value
+    
+    ' 更新参数类型数组，使用完整的参数名称
+    If gridMode = "全额上网" Then
+        paramTypes = Array( _
+            "发电小时数（单位：小时）", _
+            "电价（单位：元/kWh）", _
+            "消纳率（比率）", _
+            "初始总投资（万元）", _
+            "消交流侧装机容量（备案容量）", _
+            "运维管理费（元/W）", _
+            "技改费（元/W）", _
+            "股权资本金占比", _
+            "还款年限（年）", _
+            "利率", _
+            "脱硫燃煤标杆电价（单位：元/kWh）", _
+            "光伏电站标杆上网电价（单位：元/kWh）", _
+            "集中式光伏-脱硫燃煤标杆电价（单位：元/kWh）", _
+            "集中式光伏-综合上网电价（单位：元/kWh）" _
+        )
+    Else
+        paramTypes = Array( _
+            "发电小时数（单位：小时）", _
+            "电价（单位：元/kWh）", _
+            "消纳率（比率）", _
+            "初始总投资（万元）", _
+            "消交流侧装机容量（备案容量）", _
+            "运维管理费（元/W）", _
+            "技改费（元/W）", _
+            "股权资本金占比", _
+            "还款年限（年）", _
+            "利率", _
+            "脱硫燃煤标杆电价（单位：元/kWh）", _
+            "光伏电站标杆上网电价（单位：元/kWh）", _
+            "集中式光伏-脱硫燃煤标杆电价（单位：元/kWh）", _
+            "集中式光伏-综合上网电价（单位：元/kWh）" _
+        )
+    End If
+    
+    ' 计算每个参数5%变化后的结果
+    For i = 0 To UBound(paramTypes)
+        Dim baseValue As Double
+        Dim newValue As Double
+        Dim paramType As String
+        
+        paramType = paramTypes(i)
+        Application.StatusBar = "正在计算 " & paramType & " 的敏感性分析... (" & (i + 1) & "/" & (UBound(paramTypes) + 1) & ")"
+        
+        ' 获取基准值
+        Select Case paramType
+            Case "发电小时数（单位：小时）"
+                baseValue = baseSheet.Range("B23").Value
+            Case "电价（单位：元/kWh）"
+                baseValue = baseSheet.Range("B42").Value
+            Case "消纳率（比率）"
+                baseValue = baseSheet.Range("B37").Value
+            Case "初始总投资（万元）"
+                baseValue = baseSheet.Range("F7").Value
+            Case "消交流侧装机容量（备案容量）"
+                baseValue = baseSheet.Range("B12").Value
+            Case "运维管理费（元/W）"
+                baseValue = baseSheet.Range("F24").Value
+            Case "技改费（元/W）"
+                baseValue = baseSheet.Range("F25").Value
+            Case "股权资本金占比"
+                baseValue = baseSheet.Range("J23").Value
+            Case "还款年限（年）"
+                baseValue = baseSheet.Range("J26").Value
+            Case "利率"
+                baseValue = baseSheet.Range("J27").Value
+            Case "脱硫燃煤标杆电价（单位：元/kWh）"
+                baseValue = baseSheet.Range("B39").Value
+            Case "光伏电站标杆上网电价（单位：元/kWh）"
+                baseValue = baseSheet.Range("B41").Value
+            Case "集中式光伏-脱硫燃煤标杆电价（单位：元/kWh）"
+                baseValue = baseSheet.Range("B44").Value
+            Case "集中式光伏-综合上网电价（单位：元/kWh）"
+                baseValue = baseSheet.Range("B45").Value
+        End Select
+        
+        ' 检查基准值
+        If baseValue = 0 Then
+            MsgBox "警告：" & paramType & " 的基准值为0，无法计算敏感性系数！", vbExclamation
+            GoTo NextIteration
+        End If
+        
+        ' 计算新值 (5%增加)
+        newValue = baseValue * 1.05
+        
+        ' 计算并填充结果，添加除零检查
+        CalculateAndFillResults ws, i + 4, paramType, baseValue, newValue
+        
+        ' 强制立即计算
+        Application.CalculateFullRebuild
+        ws.Calculate
+        
+NextIteration:
+    Next i
+    
+    Application.StatusBar = ""  ' 清除状态栏
+End Sub
+
+' 新增函数：计算并填充结果
+Private Sub CalculateAndFillResults(ByVal ws As Worksheet, ByVal row As Long, ByVal paramType As String, ByVal baseValue As Double, ByVal newValue As Double)
+    Dim newIRR As Double
+    Dim newPayback As Double
+    Dim baseSheet As Worksheet
+    Dim paramChange As Double
+    
+    paramChange = 0.05  ' 5%的参数变化率
+    Set baseSheet = ThisWorkbook.Sheets("基础参数及输出结果表")
+    
+    Debug.Print "----------------------------------------"
+    Debug.Print "开始处理参数: " & paramType
+    Debug.Print "当前行号: " & row
+    Debug.Print "基准值: " & baseValue
+    Debug.Print "新值: " & newValue
+    
+    On Error Resume Next
+    
+    ' 全投资IRR
+    Dim originalIRR As Double
+    originalIRR = baseSheet.Range("N8").Value
+    Debug.Print "原始全投资IRR (N8): " & originalIRR
+    
+    newIRR = CalculateNewValue(paramType, newValue, "全投资IRR")
+    Debug.Print "计算后的新全投资IRR: " & newIRR
+    
+    ' 填充全投资IRR相关数据
+    With ws
+        Debug.Print "正在填充单元格..."
+        Debug.Print "D" & row & " (原IRR值): " & originalIRR
+        Debug.Print "E" & row & " (新IRR值): " & newIRR
+        Debug.Print "F" & row & " (参数变化率): " & paramChange
+        
+        .Cells(row, 4).Value = originalIRR        ' 原IRR值
+        .Cells(row, 5).Value = newIRR            ' 新IRR值
+        .Cells(row, 6).Value = paramChange       ' 参数变化率
+        
+        If IsNumeric(originalIRR) And IsNumeric(newIRR) And originalIRR <> 0 Then
+            Dim irrChange As Double
+            irrChange = (newIRR - originalIRR) / Abs(originalIRR)
+            Debug.Print "G" & row & " (IRR变化率): " & irrChange
+            Debug.Print "H" & row & " (敏感系数): " & (irrChange / paramChange)
+            
+            .Cells(row, 7).Value = irrChange     ' IRR变化率
+            .Cells(row, 8).Value = irrChange / paramChange  ' 敏感系数
+        Else
+            Debug.Print "警告：IRR值无效 - originalIRR=" & originalIRR & ", newIRR=" & newIRR
+            .Cells(row, 7).Value = "N/A"
+            .Cells(row, 8).Value = "N/A"
+        End If
+    End With
+    
+    ' 资本金IRR
+    originalIRR = baseSheet.Range("N10").Value
+    Debug.Print "原始资本金IRR (N10): " & originalIRR
+    
+    newIRR = CalculateNewValue(paramType, newValue, "资本金IRR")
+    Debug.Print "计算后的新资本金IRR: " & newIRR
+    
+    ' 填充资本金IRR相关数据
+    With ws
+        .Cells(row, 12).Value = originalIRR
+        .Cells(row, 13).Value = newIRR
+        .Cells(row, 14).Value = paramChange
+        
+        If IsNumeric(originalIRR) And IsNumeric(newIRR) And originalIRR <> 0 Then
+            irrChange = (newIRR - originalIRR) / Abs(originalIRR)
+            .Cells(row, 15).Value = irrChange
+            .Cells(row, 16).Value = irrChange / paramChange
+        Else
+            .Cells(row, 15).Value = "N/A"
+            .Cells(row, 16).Value = "N/A"
+        End If
+    End With
+    
+    ' 全投回收期
+    Dim originalPayback As Double
+    originalPayback = baseSheet.Range("N9").Value
+    newPayback = CalculateNewValue(paramType, newValue, "全投回收期")
+    
+    ' 填充全投回收期相关数据
+    With ws
+        .Cells(row, 20).Value = originalPayback
+        .Cells(row, 21).Value = newPayback
+        .Cells(row, 22).Value = paramChange
+        
+        If IsNumeric(originalPayback) And IsNumeric(newPayback) And originalPayback <> 0 Then
+            Dim paybackChange As Double
+            paybackChange = (newPayback - originalPayback) / Abs(originalPayback)
+            .Cells(row, 23).Value = paybackChange
+            .Cells(row, 24).Value = paybackChange / paramChange
+        Else
+            .Cells(row, 23).Value = "N/A"
+            .Cells(row, 24).Value = "N/A"
+        End If
+    End With
+    
+    ' 资本金回收期
+    originalPayback = baseSheet.Range("N11").Value
+    newPayback = CalculateNewValue(paramType, newValue, "资本金回收期")
+    
+    ' 填充资本金回收期相关数据
+    With ws
+        .Cells(row, 28).Value = originalPayback
+        .Cells(row, 29).Value = newPayback
+        .Cells(row, 30).Value = paramChange
+        
+        If IsNumeric(originalPayback) And IsNumeric(newPayback) And originalPayback <> 0 Then
+            paybackChange = (newPayback - originalPayback) / Abs(originalPayback)
+            .Cells(row, 31).Value = paybackChange
+            .Cells(row, 32).Value = paybackChange / paramChange
+        Else
+            .Cells(row, 31).Value = "N/A"
+            .Cells(row, 32).Value = "N/A"
+        End If
+    End With
+    
+    On Error GoTo 0
+End Sub
+
+' 新增函数：创建总体敏感性分析表
+Sub CreateOverallSensitivityAnalysis()
+    On Error Resume Next
+    
+    Dim ws As Worksheet
+    Dim baseSheet As Worksheet
+    Dim calcSheet As Worksheet
+    
+    ' 获取基础参数表和计算表
+    Set baseSheet = ThisWorkbook.Sheets("基础参数及输出结果表")
+    Set calcSheet = ThisWorkbook.Sheets("光伏收益测算表")
+    
+    ' 删除已存在的表
+    Application.displayAlerts = False
+    On Error Resume Next
+    ThisWorkbook.Sheets("总体敏感性分析").Delete
+    On Error GoTo 0
+    Application.displayAlerts = True
+    
+    ' 创建新的工作表
+    Set ws = ThisWorkbook.Sheets.Add(After:=ThisWorkbook.Sheets(ThisWorkbook.Sheets.Count))
+    If Err.Number <> 0 Then
+        MsgBox "创建新工作表失败：" & Err.Description, vbCritical
+        Exit Sub
+    End If
+    
+    ws.Name = "总体敏感性分析"
+    
+    On Error GoTo ErrorHandler
+    
+    ' 创建表格 - 使用数字列索引
+
+    CreateSensitivityTable ws, "全投资IRR", 2, "=基础参数及输出结果表!$N$8"           ' D列 = 2
+    CreateSensitivityTable ws, "资本金IRR", 10, "=基础参数及输出结果表!$N$10"         ' J列 = 10
+    CreateSensitivityTable ws, "全投回收期（年）", 18, "=基础参数及输出结果表!$N$9"   ' R列 = 18
+    CreateSensitivityTable ws, "资本金回收期（年）", 26, "=基础参数及输出结果表!$N$11" ' Z列 = 26
+
+    
+    ' 创建敏感性系数汇总表格
+    CreateSensitivitySummaryTable ws
+    
+    ' 设置格式
+    FormatWorksheet ws
+    
+    Exit Sub
+    
+ErrorHandler:
+    MsgBox "创建总体敏感性分析表时发生错误：" & vbNewLine & Err.Description, vbCritical
+    On Error Resume Next
+    If Not ws Is Nothing Then
+        Application.displayAlerts = False
+        ws.Delete
+        Application.displayAlerts = True
+    End If
+End Sub
+
+' 新增函数：创建单个敏感性分析表格
+Private Sub CreateSensitivityTable(ByVal ws As Worksheet, ByVal title As String, ByVal startCol As Integer, ByVal baseFormula As String)
+    On Error GoTo ErrorHandler
+    
+    Dim titleRange As Range
+    Dim headerRange As Range
+    Dim baseSheet As Worksheet
+    Dim calcSheet As Worksheet
+    Dim i As Long
+    
+    ' 检查参数
+    If ws Is Nothing Then
+        MsgBox "工作表对象为空！", vbCritical
+        Exit Sub
+    End If
+    
+    Set baseSheet = ThisWorkbook.Sheets("基础参数及输出结果表")
+    Set calcSheet = ThisWorkbook.Sheets("光伏收益测算表")
+    
+    ' 设置标题（合并7列）
+    Set titleRange = ws.Range(ws.Cells(2, startCol), ws.Cells(2, startCol + 6))
+    With titleRange
+        .MergeCells = True
+        .Value = title
+        .Font.Bold = True
+        .HorizontalAlignment = xlCenter
+        .VerticalAlignment = xlCenter
+    End With
+    
+    ' 设置表头
+    With ws
+        ' 设置表头内容
+        .Range(ws.Cells(3, startCol), ws.Cells(3, startCol + 6)).Value = _
+            Array("参数名称", "参数原基准值", "原" & title, "变动后" & title, "参数变化率", title & "变化率", "敏感系数")
+        
+        ' 设置参数名称
+        .Cells(4, startCol).Value = "发电小时数（单位：小时）"
+        .Cells(5, startCol).Value = "电价（单位：元/kWh）"
+        .Cells(6, startCol).Value = "消纳率（比率）"
+        .Cells(7, startCol).Value = "初始总投资（万元）"
+        .Cells(8, startCol).Value = "消交流侧装机容量（备案容量）"
+        .Cells(9, startCol).Value = "运维管理费（元/W）"
+        .Cells(10, startCol).Value = "技改费（元/W）"
+        .Cells(11, startCol).Value = "股权资本金占比"
+        .Cells(12, startCol).Value = "还款年限（年）"
+        .Cells(13, startCol).Value = "利率"
+        .Cells(14, startCol).Value = "脱硫燃煤标杆电价（单位：元/kWh）"
+        .Cells(15, startCol).Value = "光伏电站标杆上网电价（单位：元/kWh）"
+        .Cells(16, startCol).Value = "集中式光伏-脱硫燃煤标杆电价（单位：元/kWh）"
+        .Cells(17, startCol).Value = "集中式光伏-综合上网电价（单位：元/kWh）"
+
+        ' 设置基准值并取消横线格式
+        .Cells(4, startCol + 1).Formula = "=基础参数及输出结果表!$B$23"  ' 发电小时数
+        .Cells(5, startCol + 1).Formula = "=基础参数及输出结果表!$B$42"  ' 电价
+        .Cells(6, startCol + 1).Formula = "=基础参数及输出结果表!$B$37"  ' 消纳率
+        .Cells(7, startCol + 1).Formula = "=基础参数及输出结果表!$F$7"  ' 初始总投资
+        .Cells(8, startCol + 1).Formula = "=基础参数及输出结果表!$B$12"  ' 消交流侧装机容量（备案容量）
+        .Cells(9, startCol + 1).Formula = "=基础参数及输出结果表!$F$24"  ' 运维管理费（元/W）
+        .Cells(10, startCol + 1).Formula = "=基础参数及输出结果表!$F$25"  ' 技改费（元/W）
+        .Cells(11, startCol + 1).Formula = "=基础参数及输出结果表!$J$23"  ' 股权资本金占比
+        .Cells(12, startCol + 1).Formula = "=基础参数及输出结果表!$J$26"  ' 还款年限（年）
+        .Cells(13, startCol + 1).Formula = "=基础参数及输出结果表!$J$27"  ' 利率
+        .Cells(14, startCol + 1).Formula = "=基础参数及输出结果表!$B$39"  ' 脱硫燃煤标杆电价
+        .Cells(15, startCol + 1).Formula = "=基础参数及输出结果表!$B$41"  ' 光伏电站标杆上网电价
+        .Cells(16, startCol + 1).Formula = "=基础参数及输出结果表!$B$44"  ' 集中式光伏-脱硫燃煤标杆电价
+        .Cells(17, startCol + 1).Formula = "=基础参数及输出结果表!$B$45"  ' 集中式光伏-综合上网电价
+
+        ' 取消所有单元格的横线格式
+        .Range(.Cells(4, startCol), .Cells(6, startCol + 6)).Font.Strikethrough = False
+        
+        ' 取消基础参数及输出结果表中的删除线格式
+        With ThisWorkbook.Sheets("基础参数及输出结果表")
+            .Range("B23").Font.Strikethrough = False  ' 发电小时数
+            .Range("B42").Font.Strikethrough = False  ' 电价
+            .Range("B37").Font.Strikethrough = False  ' 消纳率
+            .Range("F7").Font.Strikethrough = False  ' 初始总投资
+            .Range("B12").Font.Strikethrough = False  ' 消交流侧装机容量
+            .Range("F24").Font.Strikethrough = False  ' 运维管理费（元/W）
+            .Range("F25").Font.Strikethrough = False  ' 技改费（元/W）
+            .Range("J23").Font.Strikethrough = False  ' 股权资本金占比
+            .Range("J26").Font.Strikethrough = False  ' 还款年限（年）
+            .Range("J27").Font.Strikethrough = False  ' 利率
+            .Range("B39").Font.Strikethrough = False  ' 脱硫燃煤标杆电价
+            .Range("B41").Font.Strikethrough = False  ' 光伏标杆上网电价
+            .Range("B44").Font.Strikethrough = False  ' 集中式光伏-脱硫燃煤标杆电价
+            .Range("B45").Font.Strikethrough = False  ' 集中式光伏-综合上网电价
+            .Range("N8:N11").Font.Strikethrough = False  ' IRR和回收期
+        End With
+        
+        ' 取消光伏收益测算表中的所有单元格删除线格式
+        With calcSheet
+            .Cells.Font.Strikethrough = False
+        End With
+        
+        ' 设置原目标值
+        Select Case title
+            Case "全投资IRR"
+                For i = 4 To 17
+                    .Cells(i, startCol + 2).Formula = "=基础参数及输出结果表!$N$8"
+                Next i
+                
+            Case "资本金IRR"
+                For i = 4 To 17
+                    .Cells(i, startCol + 2).Formula = "=基础参数及输出结果表!$N$10"
+                Next i
+                
+            Case "全投回收期（年）"
+                For i = 4 To 17
+                    .Cells(i, startCol + 2).Formula = "=基础参数及输出结果表!$N$9"
+                Next i
+                
+            Case "资本金回收期（年）"
+                For i = 4 To 17
+                    .Cells(i, startCol + 2).Formula = "=基础参数及输出结果表!$N$11"
+                Next i
+        End Select
+        
+        ' 设置参数变化率
+        For i = 4 To 17
+            .Cells(i, startCol + 4).Value = 0.05
+        Next i
+        
+
+        
+    End With
+    
+    Exit Sub
+    
+ErrorHandler:
+    MsgBox "创建敏感性分析表格时发生错误：" & vbNewLine & _
+           "标题：" & title & vbNewLine & _
+           "起始列：" & startCol & vbNewLine & _
+           "错误描述：" & Err.Description, vbCritical
+End Sub
+
+' 新增函数：创建敏感性系数汇总表格
+Private Sub CreateSensitivitySummaryTable(ByVal ws As Worksheet)
+    Dim titleRange As Range
+    Dim i As Long
+    
+    ' 设置标题
+    Set titleRange = ws.Range("AH2:AL2")
+    titleRange.Merge
+    titleRange.Value = "汇总各个参数敏感系数"
+    titleRange.Font.Bold = True
+    titleRange.HorizontalAlignment = xlCenter
+    
+    ' 设置表头
+    With ws
+        ' 设置表头内容
+        .Range("AH3:AL3").Value = Array("参数名称", "全投资IRR敏感性系数", "资本金IRR敏感性系数", "全投资回收期敏感性系数", "资本金回收期敏感性系数")
+        
+        ' 设置参数名称
+        .Range("AH4:AH17").Value = Application.Transpose(Array( _
+            "发电小时数（单位：小时）", _
+            "电价（单位：元/kWh）", _
+            "消纳率（比率）", _
+            "初始总投资（万元）", _
+            "消交流侧装机容量（备案容量）", _
+            "运维管理费（元/W）", _
+            "技改费（元/W）", _
+            "股权资本金占比", _
+            "还款年限（年）", _
+            "利率", _
+            "脱硫燃煤标杆电价（单位：元/kWh）", _
+            "光伏电站标杆上网电价（单位：元/kWh）", _
+            "集中式光伏-脱硫燃煤标杆电价（单位：元/kWh）", _
+            "集中式光伏-综合上网电价（单位：元/kWh）" _
+        ))
+        
+        ' 设置公式引用
+        For i = 4 To 17
+            ' 全投资IRR敏感性系数
+            .Cells(i, "AI").Formula = "=H" & i
+            
+            ' 资本金IRR敏感性系数
+            .Cells(i, "AJ").Formula = "=P" & i
+            
+            ' 全投资回收期敏感性系数
+            .Cells(i, "AK").Formula = "=X" & i
+            
+            ' 资本金回收期敏感性系数
+            .Cells(i, "AL").Formula = "=AF" & i
+        Next i
+        
+        ' 设置表头格式
+        With .Range("AH3:AL3")
+            .Font.Bold = True
+            .HorizontalAlignment = xlCenter
+            .VerticalAlignment = xlCenter
+            .WrapText = True
+        End With
+        
+         ' 设置数字格式
+        .Range("AI4:AL17").NumberFormat = "0.00"
+        
+        ' 清除可能存在的所有边框
+        .Range("AH2:AL17").Borders.LineStyle = xlNone
+        
+        ' 重新设置所有边框
+        With .Range("AH2:AL17")
+            ' 设置外边框粗线
+            With .Borders(xlEdgeLeft)
+                .LineStyle = xlContinuous
+                .Weight = xlMedium
+                .ColorIndex = xlAutomatic
+            End With
+            With .Borders(xlEdgeRight)
+                .LineStyle = xlContinuous
+                .Weight = xlMedium
+                .ColorIndex = xlAutomatic
+            End With
+            With .Borders(xlEdgeTop)
+                .LineStyle = xlContinuous
+                .Weight = xlMedium
+                .ColorIndex = xlAutomatic
+            End With
+            With .Borders(xlEdgeBottom)
+                .LineStyle = xlContinuous
+                .Weight = xlMedium
+                .ColorIndex = xlAutomatic
+            End With
+            
+            ' 设置标题底部边框粗线
+            .Range("AH2:AL2").Borders(xlEdgeBottom).Weight = xlMedium
+            
+            ' 设置内部边框
+            With .Range("AH3:AL17")
+                ' 水平内部边框
+                With .Borders(xlInsideHorizontal)
+                    .LineStyle = xlContinuous
+                    .Weight = xlThin
+                    .ColorIndex = xlAutomatic
+                End With
+                ' 垂直内部边框
+                With .Borders(xlInsideVertical)
+                    .LineStyle = xlContinuous
+                    .Weight = xlThin
+                    .ColorIndex = xlAutomatic
+                End With
+            End With
+        End With
+    End With
+End Sub
+
+
+' 新增函数：格式化工作表
+Private Sub FormatWorksheet(ByVal ws As Worksheet)
+    On Error GoTo ErrorHandler
+    
+    If ws Is Nothing Then
+        MsgBox "工作表对象为空！", vbCritical
+        Exit Sub
+    End If
+    
+    With ws
+        ' 设置对齐方式（不包括标题行，因为标题行已经在CreateSensitivityTable中设置）
+        .Range("B3:AL17").HorizontalAlignment = xlCenter
+        
+        ' 设置数字格式 - 第一个表格（全投资IRR）
+        .Range("C4:C5").NumberFormat = "0.00"  ' 参数原基准值列
+        .Range("C6").NumberFormat = "0.00%" ' 参数原基准值列
+        .Range("C7:C10").NumberFormat = "0.00"  ' 参数原基准值列
+        .Range("C11").NumberFormat = "0.00%" ' 参数股权资本金占比
+        .Range("C13").NumberFormat = "0.00%" ' 参数利率
+        .Range("D4:G17").NumberFormat = "0.00%" ' IRR列
+        .Range("H4:H17").NumberFormat = "0.00"  ' 敏感系数列
+        
+                ' 设置数字格式 - 第一个表格（资本金IRR）
+        .Range("K4:K5").NumberFormat = "0.00"  ' 参数原基准值列
+        .Range("K6").NumberFormat = "0.00%" ' 参数原基准值列
+        .Range("K7:K10").NumberFormat = "0.00"  ' 参数原基准值列
+        .Range("K11").NumberFormat = "0.00%" ' 参数股权资本金占比
+        .Range("K13").NumberFormat = "0.00%" ' 参数利率
+        .Range("L4:O17").NumberFormat = "0.00%" ' IRR列
+        .Range("P4:P17").NumberFormat = "0.00"  ' 敏感系数列
+        
+                 ' 设置数字格式 - 第一个表格（全投回收期）
+        .Range("S4:S5").NumberFormat = "0.00"  ' 参数原基准值列
+        .Range("S6").NumberFormat = "0.00%" ' 参数原基准值列
+        .Range("S7:S10").NumberFormat = "0.00"  ' 参数原基准值列
+        .Range("S11").NumberFormat = "0.00%" ' 参数股权资本金占比
+        .Range("S13").NumberFormat = "0.00%" ' 参数利率
+        .Range("T4:U17").NumberFormat = "0.00"  ' 回收期列
+        .Range("V4:V17").NumberFormat = "0.00%" ' 参数变化率列
+        .Range("W4:W17").NumberFormat = "0.00%" ' 回收期变化率列
+        .Range("X4:X17").NumberFormat = "0.00"  ' 敏感系数列
+        
+                         ' 设置数字格式 - 第一个表格（资本金回收期）
+        .Range("AA4:AA5").NumberFormat = "0.00"  ' 参数原基准值列
+        .Range("AA6").NumberFormat = "0.00%" ' 参数原基准值列
+        .Range("AA7:AA10").NumberFormat = "0.00"  ' 参数原基准值列
+        .Range("AA11").NumberFormat = "0.00%" ' 参数股权资本金占比
+        .Range("AA13").NumberFormat = "0.00%" ' 参数利率
+        .Range("AB4:AC17").NumberFormat = "0.00"  ' 回收期列
+        .Range("AD4:AD17").NumberFormat = "0.00%" ' 参数变化率列
+        .Range("AE4:AE17").NumberFormat = "0.00%" ' 回收期变化率列
+        .Range("AF4:AF17").NumberFormat = "0.00"  ' 敏感系数列
+        
+                ' 设置数字格式 - 第五个表格（汇总表）
+        .Range("AI4:AL17").NumberFormat = "0.00"  ' 敏感系数列
+        
+        ' 清除所有边框
+        .Range("B2:AF17").Borders.LineStyle = xlNone
+        
+        ' 设置外框粗边框
+        With .Range("B2:H17").Borders(xlEdgeLeft)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("B2:H17").Borders(xlEdgeRight)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("B2:H17").Borders(xlEdgeTop)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("B2:H17").Borders(xlEdgeBottom)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        
+        ' 设置标题行粗边框
+        With .Range("B2:H2").Borders(xlEdgeBottom)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        
+        ' 设置内部单元格细边框
+        .Range("B3:H17").Borders(xlInsideHorizontal).LineStyle = xlContinuous
+        .Range("B3:H17").Borders(xlInsideVertical).LineStyle = xlContinuous
+        
+        ' 对其他三个表格应用相同的格式
+        ' 资本金IRR表格
+        With .Range("J2:P17").Borders(xlEdgeLeft)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("J2:P17").Borders(xlEdgeRight)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("J2:P17").Borders(xlEdgeTop)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("J2:P2").Borders(xlEdgeBottom)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        .Range("J3:P17").Borders(xlInsideHorizontal).LineStyle = xlContinuous
+        .Range("J3:P17").Borders(xlInsideVertical).LineStyle = xlContinuous
+        
+        ' 全投回收期表格
+        With .Range("R2:X17").Borders(xlEdgeLeft)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("R2:X17").Borders(xlEdgeRight)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("R2:X17").Borders(xlEdgeTop)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("R2:X17").Borders(xlEdgeBottom)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("R2:X2").Borders(xlEdgeBottom)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        .Range("R3:X17").Borders(xlInsideHorizontal).LineStyle = xlContinuous
+        .Range("R3:X17").Borders(xlInsideVertical).LineStyle = xlContinuous
+        
+        ' 资本金回收期表格
+        With .Range("Z2:AF17").Borders(xlEdgeLeft)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("Z2:AF17").Borders(xlEdgeRight)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("Z2:AF17").Borders(xlEdgeTop)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("Z2:AF17").Borders(xlEdgeBottom)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        With .Range("Z2:AF2").Borders(xlEdgeBottom)
+            .LineStyle = xlContinuous
+            .Weight = xlMedium
+        End With
+        .Range("Z3:AF17").Borders(xlInsideHorizontal).LineStyle = xlContinuous
+        .Range("Z3:AF17").Borders(xlInsideVertical).LineStyle = xlContinuous
+        
+        ' 调整列宽
+        .Columns("B:AL").AutoFit
+    End With
+    
+    Exit Sub
+    
+ErrorHandler:
+    MsgBox "格式化工作表时发生错误：" & vbNewLine & Err.Description, vbCritical
+End Sub
+
+' 新增函数：计算变动后的目标值
+Function CalculateNewValue(ByVal paramType As String, ByVal newValue As Double, ByVal targetType As String) As Double
+    Static baseSheet As Worksheet
+    Static calcSheet As Worksheet
+    Dim baseValue As Double
+    Dim oldCalculation As XlCalculation
+    Dim oldScreenUpdating As Boolean
+    Dim oldEnableEvents As Boolean
+    Dim oldValue As Variant
+    Dim oldFormula As String
+    Dim gridMode As String
+    
+    ' 参数验证
+    If newValue <= 0 Then
+        MsgBox "警告：新参数值必须大于0", vbExclamation
+        Exit Function
+    End If
+    
+    ' 特殊处理：如果是集中式光伏-脱硫燃煤标杆电价，直接返回原值
+    If paramType = "集中式光伏-脱硫燃煤标杆电价" Or paramType = "集中式光伏-脱硫燃煤标杆电价（单位：元/kWh）" Then
+        Select Case targetType
+            Case "全投资IRR"
+                CalculateNewValue = baseSheet.Range("N8").Value
+            Case "资本金IRR"
+                CalculateNewValue = baseSheet.Range("N10").Value
+            Case "全投回收期"
+                CalculateNewValue = baseSheet.Range("N9").Value
+            Case "资本金回收期"
+                CalculateNewValue = baseSheet.Range("N11").Value
+        End Select
+        Exit Function
+    End If
+    
+    On Error Resume Next
+    
+    ' 保存所有Excel设置
+    oldCalculation = Application.calculation
+    oldScreenUpdating = Application.screenUpdating
+    oldEnableEvents = Application.EnableEvents
+    
+    ' 设置计算环境
+    Application.screenUpdating = False
+    Application.EnableEvents = False
+    Application.calculation = xlCalculationAutomatic
+    
+    ' 更新状态栏
+    Application.StatusBar = "正在计算 " & paramType & " 的敏感性分析..."
+    
+    ' 只在第一次调用时初始化工作表引用
+    If baseSheet Is Nothing Then
+        Set baseSheet = ThisWorkbook.Sheets("基础参数及输出结果表")
+    End If
+    If calcSheet Is Nothing Then
+        Set calcSheet = ThisWorkbook.Sheets("光伏收益测算表")
+    End If
+    
+    If baseSheet Is Nothing Or calcSheet Is Nothing Then
+        MsgBox "错误：未找到必要的工作表", vbCritical
+        GoTo ErrorHandler
+    End If
+    
+
+    
+    ' 存储原始值和格式
+    Select Case paramType
+        Case "发电小时数", "发电小时数（单位：小时）"
+            With baseSheet.Range("B23")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+            
+        Case "电价", "电价（单位：元/kWh）"
+            With baseSheet.Range("B42")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+            
+        Case "消纳率", "消纳率（比率）"
+            With baseSheet.Range("B37")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+            
+        Case "初始总投资", "初始总投资（万元）"
+            With baseSheet.Range("F7")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+            
+        Case "消交流侧装机容量", "消交流侧装机容量（备案容量）"
+            With baseSheet.Range("B12")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+            
+        Case "运维管理费（元/W）"
+            With baseSheet.Range("F24")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+            
+        Case "技改费（元/W）"
+            With baseSheet.Range("F25")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+            
+        Case "股权资本金占比"
+            With baseSheet.Range("J23")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+            
+        Case "还款年限（年）"
+            With baseSheet.Range("J26")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+            
+        Case "利率"
+            With baseSheet.Range("J27")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+            
+        Case "脱硫燃煤标杆电价", "脱硫燃煤标杆电价（单位：元/kWh）"
+            With baseSheet.Range("B39")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+        Case "光伏电站标杆上网电价", "光伏电站标杆上网电价（单位：元/kWh）"
+            With baseSheet.Range("B41")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+            
+        Case "集中式光伏-脱硫燃煤标杆电价", "集中式光伏-脱硫燃煤标杆电价（单位：元/kWh）"
+            With baseSheet.Range("B44")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+        Case "集中式光伏-综合上网电价", "集中式光伏-综合上网电价（单位：元/kWh）"
+            With baseSheet.Range("B45")
+                oldValue = .Value
+                oldFormula = .Formula
+                .Value = newValue
+            End With
+            
+        Case Else
+            MsgBox "错误：未知的参数类型 - " & paramType, vbCritical
+            GoTo ErrorHandler
+    End Select
+    
+    If Err.Number <> 0 Then
+        Debug.Print "设置新值时发生错误: " & paramType & ", " & Err.Description
+        GoTo ErrorHandler
+    End If
+    
+    ' 强制重新计算
+    Application.CalculateFullRebuild
+    Application.Calculate
+    calcSheet.Calculate
+    baseSheet.Calculate
+    
+    ' 获取目标值
+    Select Case targetType
+        Case "全投资IRR"
+            CalculateNewValue = baseSheet.Range("N8").Value
+        Case "资本金IRR"
+            CalculateNewValue = baseSheet.Range("N10").Value
+        Case "全投回收期"
+            CalculateNewValue = baseSheet.Range("N9").Value
+        Case "资本金回收期"
+            CalculateNewValue = baseSheet.Range("N11").Value
+        Case Else
+            MsgBox "错误：未知的目标类型 - " & targetType, vbCritical
+            GoTo ErrorHandler
+    End Select
+    
+    If Err.Number <> 0 Then
+        Debug.Print "获取目标值时发生错误: " & targetType & ", " & Err.Description
+        GoTo ErrorHandler
+    End If
+    
+    ' 恢复原始值
+    Select Case paramType
+        Case "发电小时数", "发电小时数（单位：小时）"
+            With baseSheet.Range("B23")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+        Case "电价", "电价（单位：元/kWh）"
+            With baseSheet.Range("B42")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+        Case "消纳率", "消纳率（比率）"
+            With baseSheet.Range("B37")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+        Case "初始总投资", "初始总投资（万元）"
+            With baseSheet.Range("F7")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+        Case "消交流侧装机容量", "消交流侧装机容量（备案容量）"
+            With baseSheet.Range("B12")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+        Case "运维管理费（元/W）"
+            With baseSheet.Range("F24")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+        Case "技改费（元/W）"
+            With baseSheet.Range("F25")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+        Case "股权资本金占比"
+            With baseSheet.Range("J23")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+        Case "还款年限（年）"
+            With baseSheet.Range("J26")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+        Case "利率"
+            With baseSheet.Range("J27")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+        Case "脱硫燃煤标杆电价", "脱硫燃煤标杆电价（单位：元/kWh）"
+            With baseSheet.Range("B39")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+        Case "光伏电站标杆上网电价", "光伏电站标杆上网电价（单位：元/kWh）"
+            With baseSheet.Range("B41")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+        Case "集中式光伏-脱硫燃煤标杆电价", "集中式光伏-脱硫燃煤标杆电价（单位：元/kWh）"
+            With baseSheet.Range("B44")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+        Case "集中式光伏-综合上网电价", "集中式光伏-综合上网电价（单位：元/kWh）"
+            With baseSheet.Range("B45")
+                If oldFormula <> "" Then .Formula = oldFormula Else .Value = oldValue
+            End With
+                        
+            
+    End Select
+    
+    ' 再次强制计算以确保恢复原状
+    Application.CalculateFullRebuild
+    Application.Calculate
+    calcSheet.Calculate
+    baseSheet.Calculate
+    
+    GoTo ExitFunction
+    
+ErrorHandler:
+    CalculateNewValue = 0
+    If Err.Number <> 0 Then
+        Debug.Print "计算过程中发生错误: " & Err.Description
+        MsgBox "计算过程中发生错误，请检查输入参数", vbExclamation
+    End If
+    
+ExitFunction:
+    ' 恢复Excel设置
+    Application.calculation = oldCalculation
+    Application.screenUpdating = oldScreenUpdating
+    Application.EnableEvents = oldEnableEvents
+    Application.StatusBar = ""  ' 清除状态栏
+    
+    On Error GoTo 0
+End Function
+
+' 新增函数：格式化单一参数分析工作表
+Private Sub FormatSingleParameterWorksheet(ByVal ws As Worksheet)
+    With ws
+        ' 设置所有使用的单元格的边框（除了第二行）
+        .Range("B3:G16").Borders.LineStyle = xlContinuous
+        
+        ' 清除第二行的边框
+        .Range("B2:G2").Borders.LineStyle = xlNone
+        
+        ' 设置对齐方式
+        .Range("B2:G16").HorizontalAlignment = xlCenter
+        
+        ' 设置数值格式
+        .Range("B11:B28").NumberFormat = "0.00"        ' 变动后的值：保留两位小数
+        .Range("C11:E28").NumberFormat = "0.00%"       ' 变动率和IRR：百分比格式
+        .Range("F11:G28").NumberFormat = "0.00"        ' 回收期：保留两位小数
+        .Range("E5:G5").NumberFormat = "0.00%"       ' 变动率和IRR：百分比格式
+        ' 调整列宽
+        .Columns("B:G").AutoFit
+        
+        ' 设置标题格式
+        .Range("B3:G3").Font.Bold = True
+        .Range("B9:G9").Font.Bold = True
+        .Range("B10:G10").Font.Bold = True
+    End With
+End Sub
+
+
+
+' 新增函数：格式化参数表格
+Private Sub FormatParameterTable(ByVal ws As Worksheet, ByVal startRow As Long)
+    With ws
+        ' 设置边框
+        .Range("B" & startRow & ":G" & (startRow + 17)).Borders.LineStyle = xlContinuous
+        
+        ' 设置对齐方式
+        .Range("B" & startRow & ":G" & (startRow + 17)).HorizontalAlignment = xlCenter
+        
+        ' 设置数值格式
+        .Range("B" & (startRow + 8) & ":B" & (startRow + 17)).NumberFormat = "0.00"        ' 变动后的值：保留两位小数
+        .Range("C" & (startRow + 8) & ":C" & (startRow + 17)).NumberFormat = "0.00%"       ' 变动率：百分比格式
+        .Range("D" & (startRow + 8) & ":E" & (startRow + 17)).NumberFormat = "0.00%"       ' IRR值：百分比格式
+        .Range("F" & (startRow + 8) & ":G" & (startRow + 17)).NumberFormat = "0.00"        ' 回收期：保留两位小数
+        
+        ' 设置原值格式
+        .Range("E" & (startRow + 1)).NumberFormat = "0.00"                                 ' 参数原值：保留两位小数
+        .Range("E" & (startRow + 2) & ":E" & (startRow + 3)).NumberFormat = "0.00%"       ' 原IRR值：百分比格式
+        .Range("E" & (startRow + 4) & ":E" & (startRow + 5)).NumberFormat = "0.00"        ' 原回收期：保留两位小数
+        
+        ' 设置标题格式
+        .Range("B" & startRow & ":G" & startRow).Font.Bold = True
+        .Range("B" & (startRow + 6) & ":G" & (startRow + 6)).Font.Bold = True
+        .Range("B" & (startRow + 7) & ":G" & (startRow + 7)).Font.Bold = True
+        
+        ' 调整列宽
+        .Columns("B:G").AutoFit
+        
+        ' 设置边框
+        With .Range("B" & startRow & ":G" & (startRow + 17))
+            .Borders(xlEdgeLeft).LineStyle = xlContinuous
+            .Borders(xlEdgeTop).LineStyle = xlContinuous
+            .Borders(xlEdgeBottom).LineStyle = xlContinuous
+            .Borders(xlEdgeRight).LineStyle = xlContinuous
+            .Borders(xlInsideVertical).LineStyle = xlContinuous
+            .Borders(xlInsideHorizontal).LineStyle = xlContinuous
+        End With
+        
+        ' 设置特殊边框
+        .Range("B" & (startRow + 6) & ":G" & (startRow + 6)).Borders(xlEdgeBottom).Weight = xlMedium
+        .Range("B" & startRow & ":G" & startRow).Borders(xlEdgeBottom).Weight = xlMedium
+    End With
+End Sub
+
+' 总体敏感性分析按钮点击事件
+Public Sub 生成总体敏感性分析表_Click()
+    On Error GoTo ErrorHandler
+    
+    ' 保存当前的Excel设置
+    Dim screenUpdating As Boolean
+    Dim calculation As XlCalculation
+    Dim displayAlerts As Boolean
+    Dim ws As Worksheet
+    
+    screenUpdating = Application.screenUpdating
+    calculation = Application.calculation
+    displayAlerts = Application.displayAlerts
+    
+    ' 设置Excel环境
+    Application.screenUpdating = False
+    Application.calculation = xlCalculationAutomatic
+    Application.displayAlerts = False
+    
+    ' 创建总体敏感性分析表
+    CreateOverallSensitivityAnalysis
+    
+    ' 计算总体敏感性分析的结果
+    CalculateOverallSensitivity
+    
+    ' 强制进行一次完整计算
+    Application.CalculateFullRebuild
+    
+    ' 获取工作表引用
+    Set ws = ThisWorkbook.Sheets("总体敏感性分析")
+        ' 清除AN列往右的边框
+    With ws.Range(ws.Cells(1, ws.Range("AN1").Column), ws.Cells(ws.Rows.Count, ws.Columns.Count))
+        .Borders.LineStyle = xlNone
+    End With
+    
+    ' 在最后设置汇总表格的边框
+    With ws.Range("AH2:AL17")
+
+        
+        ' 设置外边框
+        .Borders(xlEdgeLeft).LineStyle = xlContinuous
+        .Borders(xlEdgeLeft).Weight = xlMedium
+        .Borders(xlEdgeRight).LineStyle = xlContinuous
+        .Borders(xlEdgeRight).Weight = xlMedium
+        .Borders(xlEdgeTop).LineStyle = xlContinuous
+        .Borders(xlEdgeTop).Weight = xlMedium
+        .Borders(xlEdgeBottom).LineStyle = xlContinuous
+        .Borders(xlEdgeBottom).Weight = xlMedium
+        
+        ' 设置标题底部边框
+        ws.Range("AH2:AL2").Borders(xlEdgeBottom).LineStyle = xlContinuous
+        ws.Range("AH2:AL2").Borders(xlEdgeBottom).Weight = xlMedium
+        
+        ' 设置内部边框
+        ws.Range("AH3:AL17").Borders(xlInsideHorizontal).LineStyle = xlContinuous
+        ws.Range("AH3:AL17").Borders(xlInsideVertical).LineStyle = xlContinuous
+    End With
+    
+    ' 提示完成
+    MsgBox "总体敏感性分析表已生成完成！", vbInformation
+    
+ExitSub:
+    ' 恢复Excel设置，但保持自动计算
+    Application.screenUpdating = screenUpdating
+    Application.calculation = xlCalculationAutomatic
+    Application.displayAlerts = displayAlerts
+    Exit Sub
+    
+ErrorHandler:
+    MsgBox "生成总体敏感性分析表时发生错误：" & vbNewLine & Err.Description, vbCritical
+    Resume ExitSub
+End Sub
+
+' 单一参数敏感性分析按钮点击事件
+Public Sub 生成单一参数敏感性分析表_Click()
+    On Error GoTo ErrorHandler
+    
+    ' 保存当前的Excel设置
+    Dim screenUpdating As Boolean
+    Dim calculation As XlCalculation
+    Dim displayAlerts As Boolean
+    
+    screenUpdating = Application.screenUpdating
+    calculation = Application.calculation
+    displayAlerts = Application.displayAlerts
+    
+    ' 设置Excel环境
+    Application.screenUpdating = False
+    Application.calculation = xlCalculationAutomatic
+    Application.displayAlerts = False
+    
+    ' 创建单一参数敏感性分析表
+    CreateSingleParameterAnalysis
+    
+    ' 强制进行一次完整计算
+    Application.CalculateFullRebuild
+    
+    ' 提示完成
+    MsgBox "单一参数敏感性分析表已生成完成！", vbInformation
+    
+ExitSub:
+    ' 恢复Excel设置，但保持自动计算
+    Application.screenUpdating = screenUpdating
+    Application.calculation = xlCalculationAutomatic
+    Application.displayAlerts = displayAlerts
+    Exit Sub
+    
+ErrorHandler:
+    MsgBox "生成单一参数敏感性分析表时发生错误：" & vbNewLine & Err.Description, vbCritical
+    Resume ExitSub
+End Sub
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    

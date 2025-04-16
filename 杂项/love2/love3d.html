@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>To My Dear 堃堃 ❤️ - 3D Version</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #ffd1dc 0%, #e6f0ff 50%, #b5d8ff 100%);
+            color: #333;
+            font-family: 'Microsoft YaHei', sans-serif;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        .content {
+            position: relative;
+            z-index: 2;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            padding: 50px 0;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            margin: 20px 0;
+            animation: fadeIn 1s ease-out;
+            box-shadow: 0 5px 15px rgba(255, 182, 193, 0.3);
+        }
+
+        .photo-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.8);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            animation: slideUp 1s ease-out;
+            box-shadow: 0 5px 15px rgba(255, 182, 193, 0.3);
+        }
+
+        .photo-card {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 15px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            overflow: hidden;
+            box-shadow: 0 5px 15px rgba(181, 216, 255, 0.3);
+        }
+
+        .photo-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 0 10px 20px rgba(255, 182, 193, 0.4);
+        }
+
+        .photo-card img {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            transition: transform 0.3s ease;
+        }
+
+        .photo-card:hover img {
+            transform: scale(1.05);
+        }
+
+        .photo-card h3 {
+            color: #ff6b88;
+            margin: 10px 0;
+            font-size: 1.5em;
+            text-shadow: 0 0 10px rgba(255, 182, 193, 0.3);
+        }
+
+        .message {
+            background: rgba(255, 255, 255, 0.8);
+            padding: 30px;
+            border-radius: 20px;
+            margin: 20px 0;
+            line-height: 1.8;
+            backdrop-filter: blur(10px);
+            animation: fadeIn 1s ease-out;
+            box-shadow: 0 5px 15px rgba(255, 182, 193, 0.3);
+        }
+
+        .special-text {
+            color: #ff6b88;
+            font-size: 1.2em;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255, 182, 193, 0.3);
+        }
+
+        h1 {
+            color: #ff6b88;
+            font-size: 2.5em;
+            margin-bottom: 20px;
+            text-shadow: 0 0 10px rgba(255, 182, 193, 0.3);
+        }
+
+        .main-photo {
+            width: 300px;
+            height: 300px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 5px solid #ff6b88;
+            margin: 20px auto;
+            display: block;
+            box-shadow: 0 0 20px rgba(255, 182, 193, 0.5);
+            transition: transform 0.3s ease;
+            animation: pulse 2s infinite;
+        }
+
+        .main-photo:hover {
+            transform: scale(1.05);
+            border-color: #ff4d6d;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 20px rgba(255, 182, 193, 0.5); }
+            50% { box-shadow: 0 0 30px rgba(255, 182, 193, 0.8); }
+            100% { box-shadow: 0 0 20px rgba(255, 182, 193, 0.5); }
+        }
+
+        p {
+            margin: 10px 0;
+            font-size: 1.1em;
+            line-height: 1.6;
+            color: #444;
+        }
+
+        .emoji {
+            font-size: 1.2em;
+            margin: 0 5px;
+        }
+
+        h2 {
+            color: #ff6b88;
+            text-align: center;
+            margin: 40px 0;
+            font-size: 2em;
+            text-shadow: 0 0 10px rgba(255, 182, 193, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div class="content">
+        <div class="header">
+            <h1>亲爱的堃堃 ❤️</h1>
+            <img src="kunkun.jpg" alt="堃堃" class="main-photo">
+        </div>
+
+        <div class="message">
+            <p>亲爱的堃堃：</p>
+            <p>感谢你一路以来的陪伴与守护，谢谢你包容我的一切：</p>
+            <p>✨ 包容我的洁癖</p>
+            <p>✨ 理解我的精神状态</p>
+            <p>✨ 接纳我的任性</p>
+            <p>✨ 帮助我的家人</p>
+            <p>✨ 在我最需要的时候拯救我</p>
+            <p class="special-text">有你在身边，让我感到无比温暖和幸福 💖</p>
+        </div>
+
+        <h2>我们可爱的小家庭 🏠</h2>
+        
+        <div class="photo-section">
+            <div class="photo-card">
+                <img src="feimei.jpg" alt="肥妹" loading="lazy">
+                <h3>肥妹 <span class="emoji">🐕</span></h3>
+                <p>我们忠诚可爱的小狗狗，永远活力满满，给我们带来欢乐</p>
+            </div>
+            <div class="photo-card">
+                <img src="pipi.jpg" alt="皮皮" loading="lazy">
+                <h3>皮皮 <span class="emoji">🐱</span></h3>
+                <p>优雅的英短猫咪，安静地陪伴着我们的生活</p>
+            </div>
+            <div class="photo-card">
+                <img src="gaga.jpg" alt="嘎嘎" loading="lazy">
+                <h3>嘎嘎 <span class="emoji">🐱</span></h3>
+                <p>可爱的美短猫咪，总是带给我们意想不到的惊喜</p>
+            </div>
+        </div>
+
+        <div class="message" style="text-align: center;">
+            <p class="special-text">堃堃，谢谢你让我的生活变得如此美好！</p>
+            <p>我会一直爱着你和我们的小家庭 ❤️</p>
+        </div>
+    </div>
+
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const heartShape = new THREE.Shape();
+        const x = 0, y = 0;
+        heartShape.moveTo(x + 5, y + 5);
+        heartShape.bezierCurveTo(x + 5, y + 5, x + 4, y, x, y);
+        heartShape.bezierCurveTo(x - 6, y, x - 6, y + 7, x - 6, y + 7);
+        heartShape.bezierCurveTo(x - 6, y + 11, x - 3, y + 15.4, x + 5, y + 19);
+        heartShape.bezierCurveTo(x + 12, y + 15.4, x + 16, y + 11, x + 16, y + 7);
+        heartShape.bezierCurveTo(x + 16, y + 7, x + 16, y, x + 10, y);
+        heartShape.bezierCurveTo(x + 7, y, x + 5, y + 5, x + 5, y + 5);
+
+        const geometry = new THREE.ExtrudeGeometry(heartShape, {
+            depth: 8,
+            bevelEnabled: true,
+            bevelSegments: 2,
+            steps: 2,
+            bevelSize: 1,
+            bevelThickness: 1
+        });
+
+        const material = new THREE.MeshPhongMaterial({
+            color: 0xff6b88,
+            shininess: 100,
+            specular: 0xffffff
+        });
+
+        const heart = new THREE.Mesh(geometry, material);
+        scene.add(heart);
+
+        const pointLight = new THREE.PointLight(0xffffff, 1);
+        pointLight.position.set(0, 0, 50);
+        scene.add(pointLight);
+
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        scene.add(ambientLight);
+
+        camera.position.z = 50;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            heart.rotation.y += 0.01;
+            heart.rotation.z += 0.005;
+            renderer.render(scene, camera);
+        }
+
+        window.addEventListener('resize', () => {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            renderer.setSize(width, height);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+        });
+
+        animate();
+    </script>
+</body>
+</html>

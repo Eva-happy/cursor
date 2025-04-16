@@ -1,0 +1,324 @@
+.container {
+  padding-bottom: 120rpx;
+  background-color: #f5f5f5;
+}
+
+/* 服务详情头部 */
+.service-header {
+  position: relative;
+  width: 100%;
+  padding: 30rpx;
+  background: linear-gradient(135deg, #8A2BE2, #6B238E);
+}
+
+.service-info {
+  color: #fff;
+}
+
+.service-name {
+  font-size: 36rpx;
+  font-weight: bold;
+  margin-bottom: 10rpx;
+  display: block;
+}
+
+.service-price {
+  font-size: 32rpx;
+  color: #FFD700;
+}
+
+/* 通用部分样式 */
+.section-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 20rpx;
+  padding-left: 20rpx;
+  border-left: 8rpx solid #6B238E;
+}
+
+/* 服务说明 */
+.service-description {
+  margin: 20rpx;
+  padding: 30rpx;
+  background-color: #fff;
+  border-radius: 20rpx;
+}
+
+.description-content {
+  color: #666;
+  line-height: 1.6;
+  font-size: 28rpx;
+}
+
+/* 服务特点 */
+.service-features {
+  margin: 20rpx;
+  padding: 30rpx;
+  background-color: #fff;
+  border-radius: 20rpx;
+}
+
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20rpx;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  padding: 20rpx;
+  background-color: #f9f9f9;
+  border-radius: 15rpx;
+}
+
+.feature-text {
+  flex: 1;
+  padding-left: 20rpx;
+  border-left: 8rpx solid #6B238E;
+}
+
+.feature-title {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #333;
+  display: block;
+  margin-bottom: 5rpx;
+}
+
+.feature-desc {
+  font-size: 24rpx;
+  color: #666;
+}
+
+/* 服务流程 */
+.service-process {
+  margin: 20rpx;
+  padding: 30rpx;
+  background-color: #fff;
+  border-radius: 20rpx;
+}
+
+.process-list {
+  display: flex;
+  flex-direction: column;
+  gap: 30rpx;
+}
+
+.process-item {
+  display: flex;
+  align-items: flex-start;
+}
+
+.process-step {
+  width: 60rpx;
+  height: 60rpx;
+  background-color: #6B238E;
+  color: #fff;
+  border-radius: 30rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.process-content {
+  flex: 1;
+}
+
+.process-title {
+  font-size: 28rpx;
+  font-weight: bold;
+  color: #333;
+  display: block;
+  margin-bottom: 5rpx;
+}
+
+.process-desc {
+  font-size: 24rpx;
+  color: #666;
+}
+
+/* 用户须知 */
+.service-notice {
+  margin: 20rpx;
+  padding: 30rpx;
+  background-color: #fff;
+  border-radius: 20rpx;
+}
+
+.notice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15rpx;
+}
+
+.notice-item {
+  display: flex;
+  align-items: flex-start;
+}
+
+.notice-dot {
+  color: #6B238E;
+  margin-right: 10rpx;
+  font-size: 28rpx;
+}
+
+.notice-text {
+  flex: 1;
+  font-size: 26rpx;
+  color: #666;
+  line-height: 1.6;
+}
+
+/* 底部购买栏 */
+.bottom-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100rpx;
+  background-color: #fff;
+  display: flex;
+  align-items: center;
+  padding: 0 30rpx;
+  box-shadow: 0 -2rpx 10rpx rgba(0,0,0,0.1);
+}
+
+.contact-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20rpx;
+}
+
+.contact-btn text {
+  font-size: 20rpx;
+  color: #666;
+}
+
+.price-section {
+  flex: 1;
+  padding: 0 20rpx;
+}
+
+.price-label {
+  font-size: 24rpx;
+  color: #999;
+  margin-right: 10rpx;
+}
+
+.price-value {
+  font-size: 36rpx;
+  color: #6B238E;
+  font-weight: bold;
+}
+
+.purchase-btn {
+  width: 240rpx;
+  height: 80rpx;
+  background: linear-gradient(135deg, #8A2BE2, #6B238E);
+  color: #fff;
+  border-radius: 40rpx;
+  font-size: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
+/* 支付弹窗 */
+.payment-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0,0,0,0.5);
+  display: none;
+  z-index: 999;
+}
+
+.payment-modal.show {
+  display: flex;
+  align-items: flex-end;
+}
+
+.modal-content {
+  background-color: #fff;
+  border-radius: 30rpx 30rpx 0 0;
+  padding: 30rpx;
+  width: 100%;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30rpx;
+}
+
+.modal-title {
+  font-size: 32rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+.close-btn {
+  font-size: 40rpx;
+  color: #999;
+  padding: 10rpx;
+}
+
+.payment-info {
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #eee;
+  margin-bottom: 20rpx;
+}
+
+.payment-service {
+  font-size: 28rpx;
+  color: #333;
+  display: block;
+  margin-bottom: 10rpx;
+}
+
+.payment-price {
+  font-size: 36rpx;
+  color: #6B238E;
+  font-weight: bold;
+}
+
+.payment-methods {
+  margin-bottom: 30rpx;
+}
+
+.payment-method {
+  display: flex;
+  align-items: center;
+  padding: 20rpx;
+  border: 2rpx solid #eee;
+  border-radius: 15rpx;
+  margin-bottom: 20rpx;
+}
+
+.payment-method.selected {
+  border-color: #6B238E;
+  background-color: #f9f6fc;
+}
+
+.confirm-payment-btn {
+  width: 100%;
+  height: 88rpx;
+  background: linear-gradient(135deg, #8A2BE2, #6B238E);
+  color: #fff;
+  border-radius: 44rpx;
+  font-size: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+} 

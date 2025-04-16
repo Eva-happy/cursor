@@ -1,0 +1,107 @@
+Option Explicit
+
+' 添加对SensitivityAnalysis模块的引用
+Private Sub UserForm_Initialize()
+    ' 初始化参数列表
+    Dim baseSheet As Worksheet
+    Dim cell As Range
+    Dim lastRow As Long
+    
+    ' 获取基础参数表
+    Set baseSheet = ThisWorkbook.Sheets("基础参数及输出结果表")
+    
+    ' 清空列表框
+    lstParameters.Clear
+    
+    ' 从Q4开始读取参数列表
+    lastRow = baseSheet.Cells(baseSheet.Rows.Count, "Q").End(xlUp).row
+    For Each cell In baseSheet.Range("Q4:Q4" & lastRow)
+        If cell.Value <> "" Then
+            lstParameters.AddItem cell.Value
+        End If
+    Next cell
+End Sub
+
+Private Sub cmdOK_Click()
+    ' 确认按钮点击事件
+    On Error GoTo ErrorHandler
+    
+    ' 验证J37单元格
+    Dim baseSheet As Worksheet
+    Set baseSheet = ThisWorkbook.Sheets("基础参数及输出结果表")
+    
+    If IsEmpty(baseSheet.Range("J37").Value) Then
+        MsgBox "错误：请先在基础参数及输出结果表中设置J37单元格（贷款方式）", vbCritical
+        Exit Sub
+    End If
+    
+    Select Case baseSheet.Range("J37").Value
+        Case "新机制基金", "常规贷款"
+            ' 值有效，继续执行
+            Debug.Print "当前贷款方式: " & baseSheet.Range("J37").Value
+            Debug.Print "当前利率值: " & baseSheet.Range("J27").Value
+        Case Else
+            MsgBox "错误：J37单元格的值必须是'新机制基金'或'常规贷款'", vbCritical
+            Exit Sub
+    End Select
+    
+    If lstParameters.ListIndex = -1 Then
+        MsgBox "请选择一个参数！", vbExclamation
+        Exit Sub
+    End If
+    
+    ' 保存Excel设置
+    Dim oldCalculation As XlCalculation
+    Dim oldScreenUpdating As Boolean
+    oldCalculation = Application.calculation
+    oldScreenUpdating = Application.screenUpdating
+    
+    ' 优化性能设置
+    Application.screenUpdating = False
+    Application.calculation = xlCalculationAutomatic  ' 改为自动计算模式
+    
+    ' 强制计算基础参数表，确保J27的利率公式被正确计算
+    baseSheet.Calculate
+    Debug.Print "计算前利率值: " & baseSheet.Range("J27").Value
+    
+    ' 调用计算函数
+    Call CalculateSingleParameterAnalysis(lstParameters.Value)
+    
+    ' 提示用户下一步操作
+    MsgBox "请在B11单元格开始输入变动后的值，然后点击'运行结果'按钮进行计算。" & vbNewLine & _
+           "注意：计算过程会自动保留所有参数的原始公式和数值。", vbInformation
+    
+ExitSub:
+    ' 恢复Excel设置
+    Application.calculation = oldCalculation
+    Application.screenUpdating = oldScreenUpdating
+    
+    ' 关闭窗体
+    Unload Me
+    Exit Sub
+    
+ErrorHandler:
+    ' 错误处理
+    Dim errMsg As String
+    errMsg = "计算过程中发生错误：" & vbNewLine & _
+            "错误描述：" & Err.Description & vbNewLine & _
+            "错误代码：" & Err.Number & vbNewLine & vbNewLine & _
+            "请检查以下内容：" & vbNewLine & _
+            "1. 确保所有参数值在有效范围内" & vbNewLine & _
+            "2. 确保'基础参数及输出结果表'和'光伏收益测算表'存在" & vbNewLine & _
+            "3. 确保J37单元格（贷款方式）已正确设置为'新机制基金'或'常规贷款'" & vbNewLine & _
+            "4. 确保J27单元格（利率）的公式正确" & vbNewLine & _
+            "5. 确保计算所需的所有单元格都有正确的值"
+            
+    MsgBox errMsg, vbCritical
+    Debug.Print "错误发生在：" & Now & vbNewLine & errMsg
+    Resume ExitSub
+End Sub
+
+Private Sub cmdCancel_Click()
+    ' 取消按钮点击事件
+    Unload Me
+End Sub
+
+
+

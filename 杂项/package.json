@@ -1,0 +1,11 @@
+{
+    "name": "love-letter-to-kunkun",
+    "version": "1.0.0",
+    "description": "A special website for my dear 堃堃",
+    "scripts": {
+        "start": "serve ."
+    },
+    "dependencies": {
+        "serve": "^14.0.0"
+    }
+} 
