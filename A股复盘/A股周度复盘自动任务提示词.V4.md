@@ -102,8 +102,8 @@
 1. 版式：先打开仓库里最新一份 `archive/**/A股收盘报告_*.html`，复用它的字体、颜色、卡片和表格样式。涨红跌绿。单文件，UTF-8，CSS 和必要脚本内嵌，不依赖外部框架。手机浏览器能直接打开。三个章节放在同一页：周度总览、行业与主题、个股与异动。
 2. 文件名：`A股周度复盘_YYYY-MM-DD_2000.html`。日期用目标周最后一个交易日，不要用生成当天的休市日期。
 3. 写入路径：`archive/YYYY/MM/A股周度复盘_YYYY-MM-DD_2000.html`。同一周覆盖这个文件。
-4. 写入前先看 `scripts/build_index.py`。只有文件名或标题含「A股周度」或「A股周报」时，才标成周报；并生成 `latest-weekly.html`。当前脚本若还把这类文件当成早报，先补上这个判断再运行 `python3 scripts/build_index.py`。运行后确认 `latest.html` 仍只跳最新早报，`latest-close.html` 仍只跳最新收盘报告，`latest-weekly.html` 跳到本期 `r/YYYY-MM-DD_2000.html`。
-5. 提交并直接推送到 `main`。提交说明示例：`docs: add A-share weekly briefing YYYY-MM-DD`。GitHub Pages 只发布 `main`。若平台只能开 PR：标题同时包含最后交易日日期和「A股周度复盘」，同一轮标为可合并并 squash 合并进 `main`，不要停在草稿。合并后确认 Pages 已部署。网页入口是 Pages 链接，不是 GitHub 源码页。
+4. 写入后运行 `python3 scripts/build_index.py`。它会更新 `index.html`、英文短链 `r/YYYY-MM-DD_2000.html` 和 `latest-weekly.html`。不要改 `latest.html`（只跳最新早报）和 `latest-close.html`（只跳最新收盘报告）。
+5. 提交并推送到 `main`。提交说明示例：`docs: add A-share weekly briefing YYYY-MM-DD`。若平台只能开 PR：标题同时包含最后交易日日期和「A股周度复盘」，只改 `archive/*.html`、`r/*.html`、`index.html`、`latest.html`、`latest-close.html`、`latest-weekly.html`；同一轮把 PR 标为可合并并 squash 合并进 `main`。合并后确认 Pages 已部署。禁止停在草稿 PR。
 6. 对话里按这个顺序给出：
    - 不超过 500 字的摘要；
    - Pages 网页链接，至少这两条：`https://eva-happy.github.io/ashare-preopen-briefing/latest-weekly.html` 和 `https://eva-happy.github.io/ashare-preopen-briefing/r/YYYY-MM-DD_2000.html`；
